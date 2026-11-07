@@ -401,7 +401,7 @@ textarea::placeholder, input::placeholder { color: #637167; }
 .note-entry-copy strong { overflow: hidden; color: #c6d1c8; font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .note-entry-copy small { color: #7f8d83; font-size: 8px; }
 .note-entry > svg { color: #758379; }
-.sr-only { width: 1px; height: 1px; position: absolute; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.sr-only { width: 1px; height: 1px; position: absolute; top: 0; left: 0; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (min-width: 1500px) {
   .page-content { padding-top: 40px; }
