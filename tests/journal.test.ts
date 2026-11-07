@@ -4,7 +4,7 @@ import { forexPnl, tradeFingerprint, validateTrade } from '../src/domain/trade'
 import type { TradeInput } from '../src/domain/trade'
 import { parseCsv, previewCsv, suggestMapping } from '../src/application/tradeImport'
 import { saveTrades } from '../src/application/journal'
-import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles } from '../src/domain/backtest'
+import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles, weekendSuggestion } from '../src/domain/backtest'
 import { groupPerformance } from '../src/domain/report'
 import { alignSamples, tradeSignature } from '../src/application/alignSamples'
 import type { Trade } from '../src/types'
@@ -79,6 +79,13 @@ test('backtesting hides the current candle and forbids closing before a later mi
   assert.throws(() => closePosition(position, '2026-11-02', 'EUR/USD', 1.102, '08:00', 0))
   const result = closePosition(position, '2026-11-02', 'EUR/USD', 1.102, '08:01', 2)
   assert.ok(Math.abs(forexPnl(result).netPnl - 98) < 0.00001)
+})
+test('weekend guidance suggests the next Monday without declaring Sunday universally closed', () => {
+  assert.deepEqual(weekendSuggestion('2026-10-31'), { nextMonday: '2026-11-02' })
+  assert.deepEqual(weekendSuggestion('2026-11-01'), { nextMonday: '2026-11-02' })
+  assert.equal(weekendSuggestion('2026-11-02'), null)
+  assert.equal(weekendSuggestion('2026-02-30'), null)
+  assert.equal(weekendSuggestion(''), null)
 })
 test('replay builds higher timeframe candles using only completed minutes and current open', () => {
   const rows = [

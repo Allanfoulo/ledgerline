@@ -6,6 +6,17 @@ export type OpenPosition = { side: TradeInput['side']; lots: number; entry: numb
 export function completedCandles<T>(candles: T[], index: number): T[] { return candles.slice(0, index) }
 export type ReplayCandle = { time: string; open: number; high: number; low: number; close: number }
 
+// Calendar guidance only: broker sessions, holidays, and Sunday reopening vary.
+export function weekendSuggestion(date: string): { nextMonday: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  const day = new Date(`${date}T00:00:00Z`)
+  if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== date) return null
+  const weekday = day.getUTCDay()
+  if (weekday !== 0 && weekday !== 6) return null
+  day.setUTCDate(day.getUTCDate() + (weekday === 6 ? 2 : 1))
+  return { nextMonday: day.toISOString().slice(0, 10) }
+}
+
 // Aggregate only known minutes, adding the current minute's open without its future range.
 export function replayCandles(candles: ReplayCandle[], index: number, interval: number): ReplayCandle[] {
   const current = candles[index]

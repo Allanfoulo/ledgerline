@@ -86,6 +86,9 @@
 :root[data-theme='light'] .replay-chart-wrap { background: #f6faf4; border-color: #dce5d9; }
 :root[data-theme='light'] .backtest-candle-readout, :root[data-theme='light'] .backtest-candle-readout strong { color: #304b38; }
 :root[data-theme='light'] :is(.editor-fields label, .editor-form label, .mapping-grid label, .file-label, .strategy-select, .replay-load label) { color: #4b6451; }
+:root[data-theme='light'] .weekend-notice { background: #faf6ea; border-color: #decda6; }
+:root[data-theme='light'] .editor-section .weekend-notice p { color: #5f4c26; }
+:root[data-theme='light'] .weekend-notice small { color: #725f38; }
 :root[data-theme='light'] :is(.backtest-chart-shell.is-expanded) { background: #f3f6f1; }
 :root[data-theme='light'] .backtest-chart-shell.is-expanded .backtest-chart-controls { background: rgba(250, 252, 248, .97); border-color: #ccdacc; }
 @media (max-width: 620px) {
