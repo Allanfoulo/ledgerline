@@ -28,7 +28,10 @@ export function replayCandles(candles: ReplayCandle[], index: number, interval: 
 export function hasRepeatedPrices(candles: ReplayCandle[]): boolean {
   if (candles.length < 20) return false
   const unique = new Set(candles.map(({ open, high, low, close }) => `${open}/${high}/${low}/${close}`))
-  return unique.size <= Math.max(3, Math.floor(candles.length * 0.15))
+  const opens = new Map<number, number>()
+  for (const candle of candles) opens.set(candle.open, (opens.get(candle.open) ?? 0) + 1)
+  const mostCommonOpen = Math.max(...opens.values())
+  return unique.size <= Math.max(3, Math.floor(candles.length * 0.15)) || mostCommonOpen / candles.length >= 0.6
 }
 export function openPosition(side: TradeInput['side'], lots: number, price: number, time: string): OpenPosition {
   if (!Number.isFinite(lots) || lots <= 0 || lots > 10000 || !Number.isFinite(price) || price <= 0 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Enter a valid position size.')

@@ -91,6 +91,9 @@ test('replay builds higher timeframe candles using only completed minutes and cu
   assert.deepEqual(replayCandles(rows, 3, 15)[1], { time: '2026-11-02T08:15:00', open: 111, high: 111, low: 111, close: 111 })
   assert.equal(hasRepeatedPrices(Array.from({ length: 30 }, () => rows[0])), true)
   assert.equal(hasRepeatedPrices(rows), false)
+  const staleOpens = Array.from({ length: 30 }, (_, i) => ({ ...rows[0], high: 105 + i / 100, low: 99 - i / 100 }))
+  assert.equal(hasRepeatedPrices(staleOpens), true)
+  assert.equal(hasRepeatedPrices(Array.from({ length: 30 }, (_, i) => ({ ...rows[0], open: 100 + i / 100 }))), false)
 })
 test('replay retains absolute price changes instead of flattening candles', () => {
   const prices = [
