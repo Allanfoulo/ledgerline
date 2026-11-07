@@ -5,6 +5,7 @@ import type { TradeInput } from '../src/domain/trade'
 import { parseCsv, previewCsv, suggestMapping } from '../src/application/tradeImport'
 import { saveTrades } from '../src/application/journal'
 import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles, weekendSuggestion } from '../src/domain/backtest'
+import { orderedLine } from '../src/domain/chartDrawing'
 import { groupPerformance } from '../src/domain/report'
 import { alignSamples, tradeSignature } from '../src/application/alignSamples'
 import type { Trade } from '../src/types'
@@ -113,6 +114,13 @@ test('replay retains absolute price changes instead of flattening candles', () =
   assert.deepEqual(displayed[2], { ...prices[2], high: 3895, low: 3895, close: 3895 })
   assert.ok(displayed[0].close > displayed[0].open)
   assert.ok(displayed[1].close < displayed[1].open)
+})
+test('chart lines preserve prices and put endpoints in chronological order', () => {
+  const earlier = { time: 100, price: 3910 }
+  const later = { time: 200, price: 3890 }
+  assert.deepEqual(orderedLine(later, earlier), [earlier, later])
+  assert.equal(orderedLine(earlier, { time: 100, price: 3890 }), null)
+  assert.equal(orderedLine(earlier, { time: 200, price: NaN }), null)
 })
 test('reports group trades and preserve undefined profit factor for zero losses', () => {
   const rows = groupPerformance([{ pair: 'EUR/USD', side: 'Long', setup: '', date: '2026-11-02', netPnl: 100 }, { pair: 'EUR/USD', side: 'Short', setup: 'A', date: '2026-11-02', netPnl: -50 }, { pair: 'GBP/USD', side: 'Long', setup: 'A', date: '2026-11-03', netPnl: 20 }], 'pair')
