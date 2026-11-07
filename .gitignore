@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.npm-cache/
+.tmp/
+.node-runtime/
+.superpowers/
+.impeccable/review/
+.env.local
+.env.*.local
+.venv-mt5/
+.pip-cache/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.netlify/

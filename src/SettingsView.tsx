@@ -1,0 +1,15 @@
+import { useState } from 'react'
+import ConnectorSettings from './ConnectorSettings'
+
+type Props = {
+  keyConfigured: boolean | undefined
+  signOut: () => Promise<void>
+  saveKey: (key: string) => Promise<void>; removeKey: () => Promise<void>
+  aligned: number; total: number; syncing: boolean; progress: string; canAlign: boolean; align: () => void
+  accountId: string; accounts: Array<{ id: string; name: string }>; setAccountId: (id: string) => void
+  connectorStatus: { expiresAt: number } | null | undefined; issueConnector: () => Promise<string>; revokeConnector: () => Promise<void>
+}
+export default function SettingsView(props: Props) {
+  const [key, setKey] = useState(''); const [message, setMessage] = useState(''); const [signingOut, setSigningOut] = useState(false); const [signOutError, setSignOutError] = useState('')
+  return <><div className="settings-form"><h2>Market data</h2><p>Twelve Data key: {props.keyConfigured === undefined ? 'Checking…' : props.keyConfigured ? 'Connected' : 'Not connected'}</p><label>Twelve Data API key<input type="password" autoComplete="off" value={key} onChange={(event) => setKey(event.target.value)} placeholder={props.keyConfigured ? 'Enter a replacement key' : 'Enter your API key'}/></label><div className="settings-actions"><button className="button button-primary" disabled={!key.trim()} onClick={() => { setMessage(''); void props.saveKey(key).then(() => { setKey(''); setMessage('Key saved.') }).catch(() => setMessage('Could not save the key. Check Convex setup.')) }}>Save key</button><button className="button button-quiet" disabled={!props.keyConfigured} onClick={() => { setMessage(''); void props.removeKey().then(() => setMessage('Key removed.')).catch(() => setMessage('Could not remove the key.')) }}>Remove key</button></div><p>Your key is encrypted on the server and is not displayed after saving.</p>{message && <p role="status">{message}</p>}</div><div className="settings-form connector-settings"><h2>Historical sample trades</h2><p>Set sample entry and exit to their matching one-minute candle opens. This updates the dashboard and replay; requests are spaced out.</p><p>{props.aligned} of {props.total} sample trades aligned.</p><button className="button button-quiet" onClick={props.align} disabled={!props.canAlign || props.syncing}>{props.syncing ? 'Aligning…' : 'Align sample trades'}</button>{props.progress && <p role="status">{props.progress}</p>}</div><div className="settings-form connector-settings"><h2>Account</h2><p>Sign out of your journal on this device.</p><button className="button button-quiet" type="button" disabled={signingOut} onClick={() => { setSignOutError(''); setSigningOut(true); void props.signOut().catch(() => setSignOutError('Could not sign out. Check your connection and try again.')).finally(() => setSigningOut(false)) }}>{signingOut ? 'Signing out…' : 'Sign out'}</button>{signOutError && <p className="negative" role="alert">{signOutError}</p>}</div><ConnectorSettings accountId={props.accountId} accounts={props.accounts} setAccountId={props.setAccountId} status={props.connectorStatus} issue={props.issueConnector} revoke={props.revokeConnector}/></>
+}
