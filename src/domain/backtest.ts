@@ -6,6 +6,17 @@ export type OpenPosition = { side: TradeInput['side']; lots: number; entry: numb
 export function completedCandles<T>(candles: T[], index: number): T[] { return candles.slice(0, index) }
 export type ReplayCandle = { time: string; open: number; high: number; low: number; close: number }
 
+// Calendar guidance only: broker sessions, holidays, and Sunday reopening vary.
+export function weekendSuggestion(date: string): { nextMonday: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  const day = new Date(`${date}T00:00:00Z`)
+  if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== date) return null
+  const weekday = day.getUTCDay()
+  if (weekday !== 0 && weekday !== 6) return null
+  day.setUTCDate(day.getUTCDate() + (weekday === 6 ? 2 : 1))
+  return { nextMonday: day.toISOString().slice(0, 10) }
+}
+
 // Aggregate only known minutes, adding the current minute's open without its future range.
 export function replayCandles(candles: ReplayCandle[], index: number, interval: number): ReplayCandle[] {
   const current = candles[index]
@@ -28,7 +39,10 @@ export function replayCandles(candles: ReplayCandle[], index: number, interval: 
 export function hasRepeatedPrices(candles: ReplayCandle[]): boolean {
   if (candles.length < 20) return false
   const unique = new Set(candles.map(({ open, high, low, close }) => `${open}/${high}/${low}/${close}`))
-  return unique.size <= Math.max(3, Math.floor(candles.length * 0.15))
+  const opens = new Map<number, number>()
+  for (const candle of candles) opens.set(candle.open, (opens.get(candle.open) ?? 0) + 1)
+  const mostCommonOpen = Math.max(...opens.values())
+  return unique.size <= Math.max(3, Math.floor(candles.length * 0.15)) || mostCommonOpen / candles.length >= 0.6
 }
 export function openPosition(side: TradeInput['side'], lots: number, price: number, time: string): OpenPosition {
   if (!Number.isFinite(lots) || lots <= 0 || lots > 10000 || !Number.isFinite(price) || price <= 0 || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Enter a valid position size.')

@@ -4,7 +4,7 @@ import { forexPnl, tradeFingerprint, validateTrade } from '../src/domain/trade'
 import type { TradeInput } from '../src/domain/trade'
 import { parseCsv, previewCsv, suggestMapping } from '../src/application/tradeImport'
 import { saveTrades } from '../src/application/journal'
-import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles } from '../src/domain/backtest'
+import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles, weekendSuggestion } from '../src/domain/backtest'
 import { groupPerformance } from '../src/domain/report'
 import { alignSamples, tradeSignature } from '../src/application/alignSamples'
 import type { Trade } from '../src/types'
@@ -80,6 +80,13 @@ test('backtesting hides the current candle and forbids closing before a later mi
   const result = closePosition(position, '2026-11-02', 'EUR/USD', 1.102, '08:01', 2)
   assert.ok(Math.abs(forexPnl(result).netPnl - 98) < 0.00001)
 })
+test('weekend guidance suggests the next Monday without declaring Sunday universally closed', () => {
+  assert.deepEqual(weekendSuggestion('2026-10-31'), { nextMonday: '2026-11-02' })
+  assert.deepEqual(weekendSuggestion('2026-11-01'), { nextMonday: '2026-11-02' })
+  assert.equal(weekendSuggestion('2026-11-02'), null)
+  assert.equal(weekendSuggestion('2026-02-30'), null)
+  assert.equal(weekendSuggestion(''), null)
+})
 test('replay builds higher timeframe candles using only completed minutes and current open', () => {
   const rows = [
     { time: '2026-11-02T08:00:00', open: 100, high: 105, low: 99, close: 104 },
@@ -91,6 +98,9 @@ test('replay builds higher timeframe candles using only completed minutes and cu
   assert.deepEqual(replayCandles(rows, 3, 15)[1], { time: '2026-11-02T08:15:00', open: 111, high: 111, low: 111, close: 111 })
   assert.equal(hasRepeatedPrices(Array.from({ length: 30 }, () => rows[0])), true)
   assert.equal(hasRepeatedPrices(rows), false)
+  const staleOpens = Array.from({ length: 30 }, (_, i) => ({ ...rows[0], high: 105 + i / 100, low: 99 - i / 100 }))
+  assert.equal(hasRepeatedPrices(staleOpens), true)
+  assert.equal(hasRepeatedPrices(Array.from({ length: 30 }, (_, i) => ({ ...rows[0], open: 100 + i / 100 }))), false)
 })
 test('replay retains absolute price changes instead of flattening candles', () => {
   const prices = [
