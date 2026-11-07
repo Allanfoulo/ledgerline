@@ -21,12 +21,20 @@ export default function BacktestChart({ candles, index, pair, interval, children
     chart.current = instance
     series.current = instance.addSeries(CandlestickSeries, { upColor: '#8dd8a4', downColor: '#e8998e', wickUpColor: '#8dd8a4', wickDownColor: '#e8998e', borderVisible: false, priceFormat: { type: 'price', precision: pair === 'XAU/USD' ? 3 : 5, minMove: pair === 'XAU/USD' ? 0.001 : 0.00001 } })
     const candleSeries = series.current
+    const applyTheme = () => {
+      const light = document.documentElement.dataset.theme === 'light'
+      instance.applyOptions({ layout: { background: { type: ColorType.Solid, color: light ? '#f9fcf7' : '#131a15' }, textColor: light ? '#405d48' : '#c0cec3' }, grid: { vertLines: { color: light ? '#e5ede3' : '#243128' }, horzLines: { color: light ? '#e5ede3' : '#243128' } }, rightPriceScale: { borderColor: light ? '#d0ded0' : '#344239' } })
+      candleSeries.applyOptions({ upColor: light ? '#2b8652' : '#8dd8a4', downColor: light ? '#bd5950' : '#e8998e', wickUpColor: light ? '#2b8652' : '#8dd8a4', wickDownColor: light ? '#bd5950' : '#e8998e' })
+    }
+    applyTheme()
+    const themeObserver = new MutationObserver(applyTheme)
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
     instance.subscribeCrosshairMove((event) => {
       const value = event.seriesData.get(candleSeries)
       if (!event.time || !value || !('open' in value) || typeof event.time !== 'number') { setHovered(null); return }
       setHovered({ time: new Date(event.time * 1000).toISOString().slice(0, 19), open: value.open, high: value.high, low: value.low, close: value.close })
     })
-    return () => { instance.remove(); chart.current = null; series.current = null }
+    return () => { themeObserver.disconnect(); instance.remove(); chart.current = null; series.current = null }
   }, [pair])
 
   useEffect(() => {

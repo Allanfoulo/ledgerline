@@ -9,6 +9,7 @@ import JournalEditor from './JournalEditor'
 import { StrategyPage, TradeStrategy } from './StrategyPage'
 import Reports from './Reports'
 import Backtest from './Backtest'
+import ThemeToggle from './ThemeToggle'
 
 type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest'
 type TradesTab = 'Day' | 'Week' | 'All'
@@ -145,7 +146,7 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumb"><span>Journal</span><Icon name="chevron" size={14}/><strong>{page === 'detail' ? 'Trade detail' : pageTitle(page)}</strong></div>
-          <div className="topbar-actions"><label className="dataset-picker"><span className="sr-only">Journal data</span><select value={dataset} onChange={(event) => { setDataset(event.target.value as 'sample' | 'real'); if (page === 'detail') setPage('trades') }}><option value="sample">Sample trades</option><option value="real" disabled={!backend.authenticated}>My trades</option></select></label>{dataset === 'real' && <label className="dataset-picker"><span className="sr-only">Trading account</span><select value={backend.accountId} onChange={(event) => { backend.setAccountId(event.target.value); if (page === 'detail') setPage('trades') }}><option value="">Choose account</option>{backend.accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}<button className="icon-button mobile-menu" aria-label="Open menu"><Icon name="grid"/></button><ProfileMenu signOut={backend.signOut} openSettings={() => setPage('settings')}/></div>
+          <div className="topbar-actions"><label className="dataset-picker"><span className="sr-only">Journal data</span><select value={dataset} onChange={(event) => { setDataset(event.target.value as 'sample' | 'real'); if (page === 'detail') setPage('trades') }}><option value="sample">Sample trades</option><option value="real" disabled={!backend.authenticated}>My trades</option></select></label>{dataset === 'real' && <label className="dataset-picker"><span className="sr-only">Trading account</span><select value={backend.accountId} onChange={(event) => { backend.setAccountId(event.target.value); if (page === 'detail') setPage('trades') }}><option value="">Choose account</option>{backend.accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}<ThemeToggle/><button className="icon-button mobile-menu" aria-label="Open menu"><Icon name="grid"/></button><ProfileMenu signOut={backend.signOut} openSettings={() => setPage('settings')}/></div>
         </header>
         {backend.error && page !== 'settings' && <div className="page-content replay-error" role="alert">{backend.error}</div>}
 
