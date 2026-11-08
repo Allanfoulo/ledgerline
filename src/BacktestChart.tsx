@@ -10,7 +10,7 @@ import type { TradeInput } from './domain/trade'
 
 type Candle = { time: string; open: number; high: number; low: number; close: number }
 
-export default function BacktestChart({ candles, index, pair, interval, date, position, trades, canEnter, onBuy, onSell, onPause, children }: { candles: Candle[]; index: number; pair: string; interval: number; date: string; position: OpenPosition | null; trades: TradeInput[]; canEnter: boolean; onBuy: () => boolean; onSell: () => boolean; onPause: () => void; children: ReactNode }) {
+export default function BacktestChart({ candles, index, pair, interval, date, positions, trades, canEnter, onBuy, onSell, onPause, children }: { candles: Candle[]; index: number; pair: string; interval: number; date: string; positions: OpenPosition[]; trades: TradeInput[]; canEnter: boolean; onBuy: () => boolean; onSell: () => boolean; onPause: () => void; children: ReactNode }) {
   const shell = useRef<HTMLDivElement>(null)
   const container = useRef<HTMLDivElement>(null)
   const chart = useRef<IChartApi | null>(null)
@@ -92,10 +92,10 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
       markers.push({ time: toBucket(time), position: isBuy ? 'belowBar' : 'aboveBar', color: isBuy ? '#2b8652' : '#bd5950', shape: isBuy ? 'arrowUp' : 'arrowDown', text: `${isBuy ? 'Buy' : 'Sell'}${entry ? '' : ' · close'}` })
     }
     for (const trade of trades) { add(trade.entryTime, trade.side, true); add(trade.exitTime, trade.side, false) }
-    if (position) add(position.entryTime, position.side, true)
+    for (const position of positions) add(position.entryTime, position.side, true)
     markers.sort((a, b) => Number(a.time) - Number(b.time))
     markerApi.current?.setMarkers(markers)
-  }, [date, interval, pair, position, trades])
+  }, [date, interval, pair, positions, trades])
 
   useEffect(() => {
     const onChange = () => setFullScreen(document.fullscreenElement === shell.current)

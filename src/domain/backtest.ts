@@ -54,3 +54,8 @@ export function closePosition(position: OpenPosition, date: string, pair: Pair, 
   if (errors.length) throw new Error(errors.join(' '))
   return trade
 }
+
+// Compute all closures before mutating UI state, so a failed validation leaves every position open.
+export function closeAllPositions(positions: OpenPosition[], date: string, pair: Pair, price: number, time: string, commission: number): TradeInput[] {
+  return positions.map((position) => closePosition(position, date, pair, price, time, commission))
+}

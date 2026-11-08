@@ -536,3 +536,7 @@ textarea::placeholder, input::placeholder { color: #637167; }
   .note-date small { font-size: 8px; }
   .note-entry-copy strong { font-size: 9px; }
 }
+
+.backtest-positions { margin: 1rem 0; }
+.backtest-positions-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+.backtest-positions .trade-table button { white-space: nowrap; }
