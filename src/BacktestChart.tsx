@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CandlestickSeries, ColorType, createChart, createSeriesMarkers, LineSeries } from 'lightweight-charts'
+import { CandlestickSeries, ColorType, createChart, createSeriesMarkers } from 'lightweight-charts'
 import type { IChartApi, ISeriesApi, ISeriesMarkersPluginApi, SeriesMarker, UTCTimestamp, Time } from 'lightweight-charts'
+import { DrawingManager } from 'lightweight-charts-drawing'
+import type { DrawingKind } from 'lightweight-charts-drawing'
 import { replayCandles } from './domain/backtest'
 import type { OpenPosition } from './domain/backtest'
 import type { TradeInput } from './domain/trade'
-import { orderedLine } from './domain/chartDrawing'
-import type { ChartPoint } from './domain/chartDrawing'
 
 type Candle = { time: string; open: number; high: number; low: number; close: number }
 
@@ -18,15 +18,17 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
   const [fullScreen, setFullScreen] = useState(false)
   const [fallback, setFallback] = useState(false)
   const [hovered, setHovered] = useState<Candle | null>(null)
-  const [tool, setTool] = useState<'line' | 'buy' | 'sell' | null>(null)
-  const [pendingPoint, setPendingPoint] = useState<ChartPoint | null>(null)
-  const [lineCount, setLineCount] = useState(0)
+  const [tool, setTool] = useState<DrawingKind | 'buy' | 'sell' | null>(null)
+  const [drawingCount, setDrawingCount] = useState(0)
+  const [selectedCount, setSelectedCount] = useState(0)
+  const [canUndo, setCanUndo] = useState(false)
   const [drawingMessage, setDrawingMessage] = useState('')
-  const toolRef = useRef<'line' | 'buy' | 'sell' | null>(null)
+  const toolRef = useRef<DrawingKind | 'buy' | 'sell' | null>(null)
   const tradeActions = useRef({ onBuy, onSell, canEnter })
   tradeActions.current = { onBuy, onSell, canEnter }
-  const pendingRef = useRef<ChartPoint | null>(null)
-  const lines = useRef<Array<ISeriesApi<'Line'>>>([])
+  const drawings = useRef<DrawingManager | null>(null)
+  const history = useRef<string[]>([])
+  const restoring = useRef(false)
   const markerApi = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
 
   useEffect(() => {
@@ -36,6 +38,21 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
     series.current = instance.addSeries(CandlestickSeries, { upColor: '#8dd8a4', downColor: '#e8998e', wickUpColor: '#8dd8a4', wickDownColor: '#e8998e', borderVisible: false, priceFormat: { type: 'price', precision: pair === 'XAU/USD' ? 3 : 5, minMove: pair === 'XAU/USD' ? 0.001 : 0.00001 } })
     const candleSeries = series.current
     markerApi.current = createSeriesMarkers(candleSeries, [])
+    const manager = new DrawingManager(instance, candleSeries, { magnet: 'off', stayInDrawingMode: false })
+    drawings.current = manager
+    history.current = [manager.exportJSON()]
+    const checkpoint = () => {
+      if (restoring.current) return
+      const snapshot = manager.exportJSON()
+      if (history.current.at(-1) !== snapshot) history.current = [...history.current.slice(-99), snapshot]
+      setCanUndo(history.current.length > 1)
+    }
+    manager.on('change', (items) => setDrawingCount(items.length))
+    manager.on('selection', (ids) => setSelectedCount(ids.length))
+    manager.on('add', checkpoint)
+    manager.on('remove', checkpoint)
+    manager.on('gestureEnd', checkpoint)
+    manager.on('tool', (kind) => { toolRef.current = kind; setTool(kind); if (!kind) setDrawingMessage('') })
     instance.subscribeClick((event) => {
       if (!toolRef.current || !event.point || typeof event.time !== 'number') return
       if (toolRef.current === 'buy' || toolRef.current === 'sell') {
@@ -44,17 +61,6 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
         toolRef.current = null; setTool(null); setDrawingMessage(opened ? 'Simulated position opened at the current replay price.' : 'Could not open the simulated position. Check the session message.')
         return
       }
-      const price = candleSeries.coordinateToPrice(event.point.y)
-      if (price === null) return
-      const point = { time: event.time, price }
-      if (!pendingRef.current) { pendingRef.current = point; setPendingPoint(point); setDrawingMessage('Choose the end point on a different candle.'); return }
-      const endpoints = orderedLine(pendingRef.current, point)
-      if (!endpoints) { setDrawingMessage('Choose an end point on a different candle.'); return }
-      const line = instance.addSeries(LineSeries, { color: '#d59a38', lineWidth: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => null })
-      line.setData(endpoints.map((item) => ({ time: item.time as UTCTimestamp, value: item.price })))
-      lines.current.push(line)
-      setLineCount(lines.current.length)
-      pendingRef.current = null; setPendingPoint(null); setDrawingMessage('Line added. Choose a start point for another line.')
     })
     const applyTheme = () => {
       const light = document.documentElement.dataset.theme === 'light'
@@ -69,7 +75,7 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
       if (!event.time || !value || !('open' in value) || typeof event.time !== 'number') { setHovered(null); return }
       setHovered({ time: new Date(event.time * 1000).toISOString().slice(0, 19), open: value.open, high: value.high, low: value.low, close: value.close })
     })
-    return () => { themeObserver.disconnect(); markerApi.current?.detach(); markerApi.current = null; instance.remove(); lines.current = []; chart.current = null; series.current = null }
+    return () => { themeObserver.disconnect(); manager.destroy(); drawings.current = null; history.current = []; markerApi.current?.detach(); markerApi.current = null; instance.remove(); chart.current = null; series.current = null }
   }, [pair])
 
   useEffect(() => {
@@ -93,7 +99,7 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
 
   useEffect(() => {
     const onChange = () => setFullScreen(document.fullscreenElement === shell.current)
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { setFallback(false); toolRef.current = null; setTool(null); pendingRef.current = null; setPendingPoint(null); setDrawingMessage('') } }
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { setFallback(false); if (toolRef.current === 'buy' || toolRef.current === 'sell') { toolRef.current = null; setTool(null); setDrawingMessage('') } } }
     document.addEventListener('fullscreenchange', onChange)
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('fullscreenchange', onChange); document.removeEventListener('keydown', onKeyDown) }
@@ -121,20 +127,28 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
     chart.current?.priceScale('right').applyOptions({ autoScale: true })
   }
 
-  const chooseTool = (selected: 'line' | 'buy' | 'sell') => {
+  const chooseTool = (selected: 'trend-line' | 'horizontal-line' | 'rectangle' | 'buy' | 'sell') => {
     const next = toolRef.current === selected ? null : selected
+    drawings.current?.setTool(next === 'buy' || next === 'sell' ? null : next)
     toolRef.current = next; setTool(next)
-    pendingRef.current = null; setPendingPoint(null)
     if (next === 'buy' || next === 'sell') onPause()
-    setDrawingMessage(next === 'line' ? 'Select two points on different candles to draw a line.' : next ? `Click a candle to ${next} at the current replay open.` : '')
+    setDrawingMessage(next === 'trend-line' ? 'Select two points to draw a trend line.' : next === 'horizontal-line' ? 'Select a price to place a horizontal level.' : next === 'rectangle' ? 'Select two corners to draw a rectangle.' : next ? `Click a candle to ${next} at the current replay open.` : '')
   }
 
-  const undoLine = () => {
-    if (pendingRef.current) { pendingRef.current = null; setPendingPoint(null); setDrawingMessage('Start point cleared. Choose a new start point.'); return }
-    const last = lines.current.pop()
-    if (last && chart.current) chart.current.removeSeries(last)
-    setLineCount(lines.current.length)
-    setDrawingMessage(toolRef.current === 'line' ? 'Select two points on different candles to draw a line.' : '')
+  const undoDrawing = () => {
+    const manager = drawings.current
+    if (!manager || history.current.length < 2) return
+    restoring.current = true
+    try { history.current.pop(); manager.setTool(null); manager.importJSON(history.current[history.current.length - 1]); manager.select([]) }
+    finally { restoring.current = false }
+    setCanUndo(history.current.length > 1); setDrawingCount(manager.drawings().length); setSelectedCount(0); setDrawingMessage('Last drawing change undone.')
+  }
+
+  const deleteSelected = () => {
+    const manager = drawings.current
+    if (!manager) return
+    for (const id of [...manager.selection()]) manager.remove(id)
+    setDrawingMessage('Selected drawing removed.')
   }
 
   const toggleFullScreen = async () => {
@@ -153,9 +167,12 @@ export default function BacktestChart({ candles, index, pair, interval, date, po
     <div className="backtest-drawing-tools" role="group" aria-label="Chart drawing tools">
       <button className="button button-quiet" type="button" disabled={!canEnter} aria-pressed={tool === 'buy'} onClick={() => chooseTool('buy')}>Buy</button>
       <button className="button button-quiet" type="button" disabled={!canEnter} aria-pressed={tool === 'sell'} onClick={() => chooseTool('sell')}>Sell</button>
-      <button className="button button-quiet" type="button" aria-pressed={tool === 'line'} onClick={() => chooseTool('line')}>{tool === 'line' ? 'Finish drawing' : 'Draw line'}</button>
-      <button className="button button-quiet" type="button" disabled={!lineCount && !pendingPoint} onClick={undoLine}>Undo line</button>
-      <span role="status">{drawingMessage || `${lineCount} ${lineCount === 1 ? 'line' : 'lines'} · Drawings last for this session`}</span>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'trend-line'} onClick={() => chooseTool('trend-line')}>Trend line</button>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'horizontal-line'} onClick={() => chooseTool('horizontal-line')}>Horizontal level</button>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'rectangle'} onClick={() => chooseTool('rectangle')}>Rectangle</button>
+      <button className="button button-quiet" type="button" disabled={!selectedCount} onClick={deleteSelected}>Delete selected</button>
+      <button className="button button-quiet" type="button" disabled={!canUndo} onClick={undoDrawing}>Undo</button>
+      <span role="status">{drawingMessage || `${drawingCount} ${drawingCount === 1 ? 'drawing' : 'drawings'} · Drawings last for this session`}</span>
     </div>
     <div className="backtest-chart-toolbar" role="group" aria-label="Chart view controls">
       <button className="button button-quiet" type="button" onClick={() => zoom(1.4)} aria-label="Zoom out">−</button>
