@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { dayNotes, trades as tradeFixtures } from './data/trades'
 import { byDay, calendarTotals, enrichedTrades, equitySeries, formatMoney, formatPrice, formatSignedMoney, monthLabel, shortDate, summarize, weekDates, weekStart, weekday } from './lib/analytics'
 import type { TradeWithPnl } from './types'
@@ -8,7 +8,7 @@ import { tradeSignature } from './application/alignSamples'
 import JournalEditor from './JournalEditor'
 import { StrategyPage, TradeStrategy } from './StrategyPage'
 import Reports from './Reports'
-import Backtest from './Backtest'
+const Backtest = lazy(() => import('./Backtest'))
 import ThemeToggle from './ThemeToggle'
 
 type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest'
@@ -157,7 +157,7 @@ function App() {
         {page === 'manage' && <JournalEditor onViewTrades={() => { setDataset('real'); setPage('trades'); setActiveTab('All') }} />}
         {page === 'strategies' && <StrategyPage />}
         {page === 'reports' && <Reports trades={allTrades} />}
-        {page === 'backtest' && <Backtest />}
+        {page === 'backtest' && <Suspense fallback={<div className="page-content" role="status">Loading backtesting…</div>}><Backtest /></Suspense>}
         {page === 'settings' && <div className="page-content"><PageHeading title="Settings" description="Manage your account and market data connection."/><section className="panel settings-panel">{backend.settings}{backend.error && <p className="replay-error" role="alert">{backend.error}</p>}</section></div>}
       </main>
     </div>
