@@ -14,7 +14,7 @@ export function useConvexJournal(authenticated: boolean) {
   const printStates = new Map((prints ?? []).map((item) => [item.tradeId as string, item.status]))
   const create = useMutation(api.journal.createAccount)
   const save = useMutation(api.journal.save)
-  const realTrades: Trade[] = (rows ?? []).map((trade) => ({ ...trade, source: 'real', printStatus: printStates.get(trade.id), note: '', tags: [], executions: trade.executions.length ? trade.executions : [{ time: trade.entryTime, action: trade.side === 'Long' ? 'Buy' : 'Sell', price: trade.entry, lots: trade.lots }, { time: trade.exitTime, action: trade.side === 'Long' ? 'Sell' : 'Buy', price: trade.exit, lots: trade.lots }] }))
+  const realTrades: Trade[] = (rows ?? []).map((trade) => ({ ...trade, source: 'real', printStatus: printStates.get(trade.id), executionSource: trade.executions.length ? 'recorded' : 'derived', note: '', tags: [], executions: trade.executions.length ? trade.executions : [{ time: trade.entryTime, action: trade.side === 'Long' ? 'Buy' : 'Sell', price: trade.entry, lots: trade.lots }, { time: trade.exitTime, action: trade.side === 'Long' ? 'Sell' : 'Buy', price: trade.exit, lots: trade.lots }] }))
   return {
     accounts: accounts ?? [], accountId, setAccountId, realTrades, tradesLoading: !!accountId && rows === undefined,
     createAccount: async (name: string) => { const id = await create({ name }); setAccountId(id) },

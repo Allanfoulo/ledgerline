@@ -1,6 +1,6 @@
 # M2 proposal: chart acquisition and private PNGs
 
-This is a design proposal only. No worker, source, file storage, paid plan, or production service has been deployed. M1 creates a `queued` job, but no worker processes it yet.
+The user selected MT5 candles first and Twelve Data as an optional fallback. A bounded local reader and source-labeled interactive fallback prototype now exist; no worker, private file storage, paid plan, or production service has been deployed. M1 creates a `queued` job, but no worker processes it yet.
 
 ## Candidate data-source policy
 

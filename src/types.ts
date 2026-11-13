@@ -13,6 +13,7 @@ export type Trade = {
   source?: 'sample' | 'real'
   historicalAligned?: boolean
   printStatus?: 'pending_chart'
+  executionSource?: 'recorded' | 'derived'
   id: string
   date: string
   exitDate?: string

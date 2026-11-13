@@ -23,3 +23,13 @@ Verification: 34 Node tests pass, including repeat sync, 100 positions, original
 Rollback: turn off the frontend feature flag; keep the additive tables and existing data intact. Revert the connector mutation to stop creating new records if the backend must be rolled back. Do not delete tables or records. Validate rollback and forward migrations in an isolated deployment before release.
 
 Next: review M1 and approve M2 source, worker, quota and privacy decisions in `M2_CHART_DESIGN.md`. No PNG/chart worker exists yet.
+
+## M2 chart foundation (partial)
+
+The user selected MT5 history first and Twelve Data as an optional fallback. `connector/mt5_chart.py` reads a bounded UTC M1 window without uploading or changing the terminal account. `src/domain/printChart.ts` validates observed OHLC data and creates a source-labeled chart specification retaining all recorded executions and their minute precision. The chart view shows execution-time arrows and an exact-price fill table; arrows are positioned relative to candle bars, not at the actual fill-price coordinates. Missing candles or ambiguous overnight fill dates are not invented.
+
+When an MT5 Print is available and the user explicitly loads existing Twelve Data replay candles, the optional chart can be rendered using that fallback, but only for real recorded executions. The Print remains pending its saved chart. The chart is lazy-loaded and does not claim a broker-terminal screenshot.
+
+Read-only local verification against one actual gold position returned 998 candles with partial coverage; no trade details, candles or tokens were uploaded. Synthetic tests cover gaps, duplicate/invalid data, gold suffixes, UTC rollover and multiple fills. Synthetic browser checks cover both themes and the integrated Twelve Data fallback path.
+
+M2 is not complete: MT5 candle acquisition is not connected to queued jobs or the app; the local reader does not upload; automatic provider fallback, worker leasing/retry, image rendering, private PNG storage, owner-authorized serving and isolated deployment tests are not implemented. No automatic image is created and no provider or production service was deployed. These remain required before claiming M2 complete.
