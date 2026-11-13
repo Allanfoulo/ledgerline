@@ -12,11 +12,12 @@ const Backtest = lazy(() => import('./Backtest'))
 import ThemeToggle from './ThemeToggle'
 import BrandLockup from './BrandLockup'
 import PrintBackfill from './PrintBackfill'
-import { tradePrintsEnabled } from './config/features'
+import { executionPlansEnabled, tradePrintsEnabled } from './config/features'
 import TradePrintCaptureWorker from './TradePrintCaptureWorker'
 import TradePrintArtifact from './TradePrintArtifact'
+import ExecutionPlans from './ExecutionPlans'
 
-type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest'
+type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest' | 'execution-plans'
 type TradesTab = 'Day' | 'Week' | 'All'
 const latestSampleDate = tradeFixtures.map((trade) => trade.date).sort().at(-1) ?? ''
 
@@ -26,6 +27,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     grid: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></>,
     chart: <><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/><path d="M16 7h3v3"/></>,
     book: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5v15A2.5 2.5 0 0 1 7.5 17H20"/><path d="M9 7h7"/></>,
+    plan: <><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4"/></>,
     search: <><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></>,
     chevron: <path d="m9 18 6-6-6-6"/>,
     down: <path d="m7 10 5 5 5-5"/>,
@@ -130,6 +132,7 @@ function App() {
         <nav className="primary-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === 'dashboard' ? 'active' : ''}`} onClick={() => setPage('dashboard')}><Icon name="grid"/><span>Dashboard</span></button>
           <button className={`nav-item ${page === 'trades' || page === 'detail' ? 'active' : ''}`} onClick={() => { setPage('trades'); setActiveTab('All') }}><Icon name="chart"/><span>Trades</span><span className="nav-count">{allTrades.length}</span></button>
+          {executionPlansEnabled && <button className={`nav-item ${page === 'execution-plans' ? 'active' : ''}`} onClick={() => setPage('execution-plans')}><Icon name="plan"/><span>Plans</span></button>}
           <button className={`nav-item ${page === 'notes' ? 'active' : ''}`} onClick={() => setPage('notes')}><Icon name="book"/><span>Notebook</span></button>
           <button className={`nav-item ${page === 'manage' ? 'active' : ''}`} onClick={() => setPage('manage')}><Icon name="plus"/><span>Add trades</span></button>
           <button className={`nav-item ${page === 'strategies' ? 'active' : ''}`} onClick={() => setPage('strategies')}><Icon name="book"/><span>Strategies</span></button>
@@ -161,6 +164,7 @@ function App() {
         {page === 'notes' && <Notebook trades={allTrades} dayNoteEdits={currentDayNotes} onSelectDay={selectDay} />}
         {page === 'manage' && <JournalEditor onViewTrades={() => { setDataset('real'); setPage('trades'); setActiveTab('All') }} />}
         {page === 'strategies' && <StrategyPage />}
+        {executionPlansEnabled && page === 'execution-plans' && <ExecutionPlans />}
         {page === 'reports' && <Reports trades={allTrades} />}
         {page === 'backtest' && <Suspense fallback={<div className="page-content" role="status">Loading backtesting…</div>}><Backtest /></Suspense>}
         {page === 'settings' && <div className="page-content"><PageHeading title="Settings" description="Manage your account and market data connection."/><section className="panel settings-panel">{backend.settings}{backend.error && <p className="replay-error" role="alert">{backend.error}</p>}</section></div>}
@@ -169,7 +173,7 @@ function App() {
   )
 }
 
-function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : 'Trade detail' }
+function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : page === 'execution-plans' ? 'Execution Plans' : 'Trade detail' }
 
 function PageHeading({ title, description, actions }: { title: string; description: string; actions?: React.ReactNode }) {
   return <div className="page-heading"><div><h1>{title}</h1><p>{description}</p></div>{actions && <div className="heading-actions">{actions}</div>}</div>

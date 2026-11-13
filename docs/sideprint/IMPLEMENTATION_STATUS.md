@@ -43,3 +43,13 @@ Automatic timestamped PNG capture after sync is still **not implemented**: there
 The optional PNG compositor includes the chart, direction, net P&L, recorded fills, source labels, capture time and TradingView attribution. It is a rendering building block, not an automatically saved artifact.
 
 Current implementation update: automatic MT5 candle transfer and browser capture are wired locally; see [M2 automatic Trade Print capture](M2_AUTOMATION_IMPLEMENTATION.md). This newer implementation note supersedes the earlier pending-capture paragraph above.
+
+## M3 execution plans (implemented locally; not deployed)
+
+The dedicated branch `feature/sideprint-execution-plans` adds a five-section Guided flow and a Quick form over one typed plan structure. Optional account binding is checked against Convex Auth ownership. Draft writes and commits use an optimistic revision number; commit records server time and inserts an immutable original version. Later changes append a version with a reason and link to the previous version. Existing snapshots have no update mutation. Cancellation and expiry require a reason and do not create trades or P&L.
+
+Risk is recorded as a USD maximum loss and/or an account percentage, with optional user-entered protective stop and size notes. No sizing is calculated. Confirmations are user-authored; empty confirmation lists are allowed, with no fixed count. Verified-source confirmations are rejected until a trusted evidence source is implemented. The UI discloses that an unlinked plan timestamp does not prove it predates a trade. `VITE_EXECUTION_PLANS_ENABLED` defaults off and should only be enabled after matching Convex functions and schema are deployed together.
+
+Verification on this branch: app and Convex TypeScript no-emit checks pass; the in-memory test runner passes 43 tests, including five plan tests for validation, account ownership, stale writes, immutable revisions and closure reasons. Vite production bundling passes in memory. The standard `npm test` script cannot create its `.tmp` folder in this restricted worktree, and the full production build cannot write its output; live Convex migrations, signed-in browser review and deployment have not been performed.
+
+Next milestone: M4 Plan-to-Print linking, Print Review and deterministic Review Queue, on a new feature branch. Keep M5+ features isolated on subsequent branches.

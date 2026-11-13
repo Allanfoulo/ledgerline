@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as backtests from "../backtests.js";
 import type * as connector from "../connector.js";
+import type * as executionPlans from "../executionPlans.js";
 import type * as http from "../http.js";
 import type * as identity from "../identity.js";
 import type * as journal from "../journal.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   backtests: typeof backtests;
   connector: typeof connector;
+  executionPlans: typeof executionPlans;
   http: typeof http;
   identity: typeof identity;
   journal: typeof journal;
