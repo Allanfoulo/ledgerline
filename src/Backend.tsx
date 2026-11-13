@@ -32,7 +32,7 @@ type Backend = {
 }
 const unavailable = async (): Promise<never> => { throw new Error('Connect Convex and sign in first') }
 const empty: Backend = { configured: false, authenticated: false, keyConfigured: false, error: '', signOut: unavailable, dayNotes: {}, tradeNotes: {}, samplePrices: {}, accounts: [], accountId: '', setAccountId: () => {}, realTrades: [], tradesLoading: false, strategies: [], reviews: [], backtests: [], saveBacktest: unavailable, saveStrategy: unavailable, saveReview: unavailable, createAccount: unavailable, saveTrades: unavailable, saveNote: () => {}, candles: unavailable, settings: <p>Connect a Convex deployment to enable sign-in and API key settings. See the project README for setup.</p> }
-const BackendContext = createContext<Backend>(empty)
+export const BackendContext = createContext<Backend>(empty)
 export const useBackend = () => useContext(BackendContext)
 
 export function ConnectedBackend({ children }: { children: React.ReactNode }) {

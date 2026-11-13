@@ -99,3 +99,5 @@
   .auth-theme { top: 14px; right: 20px; }
   :root[data-theme='light'] .sidebar { background: rgba(232, 239, 230, .98); }
 }
+
+:root[data-theme="light"] .brand-copy small { color: #52675a; }

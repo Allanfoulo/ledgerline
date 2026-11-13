@@ -16,3 +16,5 @@ The product is a personal trading journal and performance-review workspace, not 
 - Remaining QA: the entire authenticated flow (including manual/CSV saves, strategies, live historical replay, practice-session save and MT5 token actions) was not exercised end to end against a real account. The full before/after and responsive capture matrix, keyboard and contrast audit remain incomplete. The Impeccable detector returned 376 advisory findings, largely inherited hard-coded design values; they need manual review.
 - Existing portability limitation: the MT5 command displays an installation-specific path; a warning was added, but a cross-platform connector setup has not been implemented.
 - No deployment, backend schema, trading formula or connector logic change was performed for this redesign. The branch remains local until publication is explicitly authorized.
+
+Further QA results and remaining live-service limitations are documented in `docs/sideprint-qa-report.md`.
