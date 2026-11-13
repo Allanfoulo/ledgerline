@@ -52,7 +52,7 @@ export const listPrints = query({ args: { accountId: v.id('tradingAccounts') }, 
   const account = await ctx.db.get(accountId)
   if (!account || !belongsTo(account.owner, user)) throw new Error('Account not found')
   const prints = await ctx.db.query('tradePrints').withIndex('by_owner_account', (q) => q.eq('owner', account.owner).eq('accountId', accountId)).collect()
-  return prints.map(({ tradeId, status, origin, timePrecision }) => ({ tradeId, status, origin, timePrecision }))
+  return prints.map(({ tradeId, status, origin, timePrecision, capturedAt, sourceRetrievedAt, coverage, imageStorageId }) => ({ tradeId, status, origin, timePrecision, capturedAt, sourceRetrievedAt, coverage, imageAvailable: !!imageStorageId }))
 } })
 
 // Explicit, resumable pages only; old manual/CSV rows have no trustworthy MT5 source key.
@@ -69,7 +69,7 @@ export const backfillPrints = mutation({ args: { accountId: v.id('tradingAccount
     const printId = existing?._id ?? await ctx.db.insert('tradePrints', { owner: account.owner, accountId, tradeId: trade._id, origin: 'mt5', timePrecision: 'minute', status: 'pending_chart', createdAt, schemaVersion: 1 })
     if (!existing) created++
     const job = await ctx.db.query('printJobs').withIndex('by_print', (q) => q.eq('printId', printId)).unique()
-    if (!job) await ctx.db.insert('printJobs', { owner: account.owner, accountId, tradeId: trade._id, printId, status: 'queued', createdAt, schemaVersion: 1 })
+    if (!job) await ctx.db.insert('printJobs', { owner: account.owner, accountId, tradeId: trade._id, printId, status: 'queued', attempts: 0, createdAt, schemaVersion: 1 })
   }
   return { created, isDone: page.isDone, continueCursor: page.continueCursor }
 } })

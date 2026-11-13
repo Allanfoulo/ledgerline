@@ -23,3 +23,9 @@ For N eligible imports, a naive single-request-per-trade approach is N candle re
 ## Review gate
 
 Decide source order and entitlements, data retention, private access method, worker host, quotas and cost ceiling. Demonstrate one authorized end-to-end chart and stored image in an isolated deployment before claiming automatic PNG generation. Manual/CSV origins and a full review queue remain separate milestones.
+
+## Selected local implementation
+
+The first implementation uses the existing MT5 connector for candle acquisition and a signed-in browser worker for Lightweight Charts capture. It stores bounded candles on the owner-scoped Print and stores the timestamped PNG in Convex File Storage through an authenticated mutation. Images are returned through an owner-checked action; direct bearer URLs are not shared. The connector is capped at five jobs per cycle, with two-minute leases and three total attempts. MT5 history gaps remain explicitly partial, and unavailable bars are marked `needs_data`.
+
+The browser worker runs while the account owner is signed in and the app is open. If the app is closed after synchronization, the queued capture waits until its next open session; there is no server-side headless renderer. This implementation does not activate Twelve Data fallback, paid services, public sharing or production rollout. Candle and image retention currently follows the trade record; a delete/retention workflow and isolated Convex deployment validation are still open before rollout.

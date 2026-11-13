@@ -13,6 +13,8 @@ import ThemeToggle from './ThemeToggle'
 import BrandLockup from './BrandLockup'
 import PrintBackfill from './PrintBackfill'
 import { tradePrintsEnabled } from './config/features'
+import TradePrintCaptureWorker from './TradePrintCaptureWorker'
+import TradePrintArtifact from './TradePrintArtifact'
 
 type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest'
 type TradesTab = 'Day' | 'Week' | 'All'
@@ -120,6 +122,7 @@ function App() {
 
   return (
     <div className="app-shell">
+      <TradePrintCaptureWorker enabled={tradePrintsEnabled && backend.authenticated}/>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <BrandLockup/>
@@ -254,7 +257,7 @@ function TradeTable({ trades, onOpenTrade, compact = false }: { trades: TradeWit
     <thead><tr><th>Date</th><th>Pair / setup</th><th>Side</th><th>Lots</th><th>Entry → exit</th><th>Move</th><th>Net P&L</th><th><span className="sr-only">Open trade</span></th></tr></thead>
     <tbody>{trades.length ? trades.map((trade) => <tr key={trade.id} onClick={() => onOpenTrade(trade)} tabIndex={0} onKeyDown={(event) => event.key === 'Enter' && onOpenTrade(trade)}>
       <td><span className="table-date">{shortDate(trade.date)}</span><small>{trade.entryTime}</small></td>
-      <td><span className="pair-name">{trade.pair}</span><small>{trade.setup}</small>{trade.printStatus && <small className="print-status">Trade Print · Saved chart pending</small>}</td>
+      <td><span className="pair-name">{trade.pair}</span><small>{trade.setup}</small>{trade.printStatus && <small className="print-status">Trade Print · {trade.printStatus.replaceAll('_', ' ')}</small>}</td>
       <td><span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span></td>
       <td className="numeric">{trade.lots.toFixed(2)}</td>
       <td className="numeric price-range">{formatPrice(trade.entry)} <span>→</span> {formatPrice(trade.exit)}</td>
@@ -313,12 +316,13 @@ function TradeDetail({ trade, dayNote, tradeNote, setTradeNote, noteSaved, onSav
   return <div className="page-content detail-content">
     <button className="back-button" onClick={onBack}><Icon name="left" size={16}/> Back to trades</button>
     <PageHeading title={`${trade.pair} · ${trade.side}`} description={`${shortDate(trade.date)} ${trade.entryTime} – ${shortDate(trade.exitDate ?? trade.date)} ${trade.exitTime} UTC`}/>
-    <section className="detail-hero panel"><div className="detail-instrument"><span className="record-label">ON RECORD</span>{trade.printStatus && <span className="print-status">Trade Print · Saved chart pending</span>}<span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span><span>{trade.lots.toFixed(2)} lots</span><span className="detail-sep"/><span>{trade.setup}</span></div><div className="detail-pnl"><span>NET RESULT</span><strong className={currencyClass(trade.netPnl)}>{formatSignedMoney(trade.netPnl)}</strong></div><div className="detail-breakdown"><div><span>{trade.pair === 'XAU/USD' ? 'Ticks (0.001)' : 'Pips'}</span><strong className={currencyClass(trade.pips)}>{trade.pips > 0 ? '+' : ''}{trade.pips.toFixed(1)}</strong></div><div><span>Gross P&L</span><strong>{formatSignedMoney(trade.grossPnl)}</strong></div><div><span>Commission</span><strong className="negative">−{formatMoney(trade.commission)}</strong></div><div><span>Swap</span><strong>{trade.swap ? formatSignedMoney(-trade.swap) : formatMoney(0)}</strong></div></div></section>
+    <section className="detail-hero panel"><div className="detail-instrument"><span className="record-label">ON RECORD</span>{trade.printStatus && <span className="print-status">Trade Print · {trade.printStatus.replaceAll('_', ' ')}</span>}<span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span><span>{trade.lots.toFixed(2)} lots</span><span className="detail-sep"/><span>{trade.setup}</span></div><div className="detail-pnl"><span>NET RESULT</span><strong className={currencyClass(trade.netPnl)}>{formatSignedMoney(trade.netPnl)}</strong></div><div className="detail-breakdown"><div><span>{trade.pair === 'XAU/USD' ? 'Ticks (0.001)' : 'Pips'}</span><strong className={currencyClass(trade.pips)}>{trade.pips > 0 ? '+' : ''}{trade.pips.toFixed(1)}</strong></div><div><span>Gross P&L</span><strong>{formatSignedMoney(trade.grossPnl)}</strong></div><div><span>Commission</span><strong className="negative">−{formatMoney(trade.commission)}</strong></div><div><span>Swap</span><strong>{trade.swap ? formatSignedMoney(-trade.swap) : formatMoney(0)}</strong></div></div></section>
     <div className="detail-columns"><div className="detail-main-column">
       {trade.source === 'real' && <TradeStrategy tradeId={trade.id}/>}
       <section className="panel execution-panel"><div className="panel-heading"><div><h2>Execution</h2><p>Entry and exit fills for this trade.</p></div><span className="execution-count">{trade.executions.length} fills</span></div><div className="execution-table"><div className="execution-row execution-head"><span>Time</span><span>Action</span><span>Price</span><span>Size</span></div>{trade.executions.map((execution, index) => <div className="execution-row" key={`${trade.id}-${index}`}><span>{trade.exitDate && trade.exitDate !== trade.date ? `${shortDate(execution.date ?? trade.date)} ` : ""}{execution.time}</span><span><i className={`execution-dot ${execution.action.toLowerCase()}`}/>{execution.action}</span><strong>{formatPrice(execution.price)}</strong><span>{execution.lots.toFixed(2)} lots</span></div>)}</div><div className="entry-exit-line"><div><span>Entry</span><strong>{formatPrice(trade.entry)}</strong><small>{shortDate(trade.date)} {trade.entryTime}</small></div><div className="price-track"><span/><i/></div><div><span>Exit</span><strong>{formatPrice(trade.exit)}</strong><small>{shortDate(trade.exitDate ?? trade.date)} {trade.exitTime}</small></div></div></section>
       <section className="panel detail-note"><div className="panel-heading"><div><h2>Trade note</h2><p>Keep the context attached to the decision.</p></div><span className="note-state">{!backend.authenticated ? 'SIGN IN TO SAVE' : noteSaved ? 'SAVE REQUESTED' : 'EDITING'}</span></div><textarea aria-label="Trade note" value={tradeNote} onChange={(event) => setTradeNote(event.target.value)} placeholder="Add your observation about this trade…"/><div className="note-actions"><div className="tag-list">{trade.tags.map((tag) => <span className="trade-tag" key={tag}>{tag}</span>)}</div><button className="button button-primary" onClick={onSaveNote} disabled={!backend.authenticated}>Save note</button></div></section>
     </div><aside className="detail-side-column"><section className="panel trade-context"><div className="panel-heading"><div><h2>Trade context</h2><p>Setup and process tags.</p></div></div><div className="context-row"><span>Strategy</span><strong>{trade.setup}</strong></div>{trade.brokerSymbol && <div className="context-row"><span>Broker symbol</span><strong>{trade.brokerSymbol}</strong></div>}<div className="context-row"><span>Direction</span><strong>{trade.side}</strong></div><div className="context-row"><span>Position size</span><strong>{trade.lots.toFixed(2)} lots</strong></div><div className="context-row"><span>Duration</span><strong>{duration(trade.date, trade.entryTime, trade.exitDate ?? trade.date, trade.exitTime)}</strong></div><div className="context-tags">{trade.tags.map((tag) => <span className="trade-tag" key={tag}>{tag}</span>)}</div></section><section className="panel day-context"><div className="panel-heading"><div><h2>Day note</h2><p>{shortDate(trade.exitDate ?? trade.date)}</p></div></div><p>{dayNote || 'No note for this trading day yet.'}</p></section></aside></div>
+    {trade.source === 'real' && trade.printStatus && <TradePrintArtifact key={`print-${trade.id}`} tradeId={trade.id}/>}
     <Replay key={trade.id} trade={trade}/>
     <div className="demo-note"><span className="status-dot"/>{trade.source === 'real' ? 'Your saved execution details.' : 'Sample execution details.'} P&L includes commissions and swap.</div>
   </div>

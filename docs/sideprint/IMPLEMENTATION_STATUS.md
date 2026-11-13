@@ -24,12 +24,22 @@ Rollback: turn off the frontend feature flag; keep the additive tables and exist
 
 Next: review M1 and approve M2 source, worker, quota and privacy decisions in `M2_CHART_DESIGN.md`. No PNG/chart worker exists yet.
 
-## M2 chart foundation (partial)
+## M2 chart foundation and capture pipeline (implemented locally; not deployed)
 
-The user selected MT5 history first and Twelve Data as an optional fallback. `connector/mt5_chart.py` reads a bounded UTC M1 window without uploading or changing the terminal account. `src/domain/printChart.ts` validates observed OHLC data and creates a source-labeled chart specification retaining all recorded executions and their minute precision. The chart view shows execution-time arrows and an exact-price fill table; arrows are positioned relative to candle bars, not at the actual fill-price coordinates. Missing candles or ambiguous overnight fill dates are not invented.
+The user selected MT5 history first and Twelve Data as an optional fallback. `connector/mt5_chart.py` reads a bounded UTC M1 window. The updated `connector/mt5_sync.py` claims up to five queued chart jobs on each synchronization cycle, requests candles from the matching local MT5 account, and submits only the bounded candle window. It never sends a terminal password or executes an order. The server validates the connector token, broker binding, source position and candle window before attaching candles to the owner-scoped Print.
 
-When an MT5 Print is available and the user explicitly loads existing Twelve Data replay candles, the optional chart can be rendered using that fallback, but only for real recorded executions. The Print remains pending its saved chart. The chart is lazy-loaded and does not claim a broker-terminal screenshot.
+The signed-in app polls ready jobs while open, builds the chart with Lightweight Charts, captures it through the existing PNG compositor and stores the image in Convex File Storage. The timestamp is issued by the server when capture begins. The image includes the observed candle source, coverage, all recorded execution prices and times, position direction, net P&L and TradingView attribution. The interactive chart and saved image are shown on the real trade detail. Image reads go through an authenticated action that checks the owner; direct bearer URLs are never exposed.
 
 Read-only local verification against one actual gold position returned 998 candles with partial coverage; no trade details, candles or tokens were uploaded. Synthetic tests cover gaps, duplicate/invalid data, gold suffixes, UTC rollover and multiple fills. Synthetic browser checks cover both themes and the integrated Twelve Data fallback path.
 
-M2 is not complete: MT5 candle acquisition is not connected to queued jobs or the app; the local reader does not upload; automatic provider fallback, worker leasing/retry, image rendering, private PNG storage, owner-authorized serving and isolated deployment tests are not implemented. No automatic image is created and no provider or production service was deployed. These remain required before claiming M2 complete.
+This pipeline is implemented in the local feature branch only. It uses two-minute acquisition/render leases and up to three attempts; unavailable MT5 history becomes an explicit `needs_data` state. The connector processes at most five jobs per cycle. The app polls every 15 seconds and captures while the account owner is signed in. If the app is closed, candles remain queued for capture until the owner opens the app again. This is not a server-side renderer. The optional Twelve Data fallback is not connected to this worker.
+
+## Reference-inspired chart workspace
+
+The interactive chart uses the supplied reference as visual direction: chart-first layout, a compact execution record, instrument/source context and responsive stacking. Direction, net P&L and entry/exit roles come from existing trade data and formulas. The mockup's fictional values and unimplemented review controls were not added. Both marker placement and the adjacent fill table use recorded fills; missing-time candles produce an explicit warning. Synthetic dark and 390px screenshots are in `docs/sideprint/screenshots/`.
+
+Automatic timestamped PNG capture after sync is still **not implemented**: there is no queue consumer, job lease/retry, private image storage or authorized retrieval path. A browser PNG compositor has been tested with synthetic data, but it is not attached to synchronization and does not persist an image. Its prototype timestamp uses the client clock; a worker must supply a trustworthy capture time. The visible “Pending capture” state is honest and must not be interpreted as an existing image. Do not claim the reconstructed chart is an MT5 terminal screenshot.
+
+The optional PNG compositor includes the chart, direction, net P&L, recorded fills, source labels, capture time and TradingView attribution. It is a rendering building block, not an automatically saved artifact.
+
+Current implementation update: automatic MT5 candle transfer and browser capture are wired locally; see [M2 automatic Trade Print capture](M2_AUTOMATION_IMPLEMENTATION.md). This newer implementation note supersedes the earlier pending-capture paragraph above.

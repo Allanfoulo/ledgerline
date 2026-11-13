@@ -637,3 +637,29 @@ textarea::placeholder, input::placeholder { color: #637167; }
 .print-chart-body a { color: var(--green); }
 
 .print-chart .trade-table tbody tr { cursor: default; }
+
+.print-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, 260px); gap: 14px; align-items: stretch; }
+.print-chart-main, .print-record { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.print-chart-main { overflow: hidden; }
+.print-instrument { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 48px; padding: 10px 14px; color: var(--muted); font-size: 11px; }
+.print-instrument strong { color: var(--text); font-size: 14px; }
+.print-coverage { margin-left: auto; }
+.print-chart-main .print-chart-canvas { border: 0; border-radius: 0; }
+.print-record { padding: 16px; }
+.print-record h3 { margin: 0; color: var(--text); font-size: 14px; }
+.print-record dl { margin: 16px 0; }
+.print-record dl div { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.print-record dt { color: var(--muted); }
+.print-record dd { margin: 0; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.print-record dd.positive { color: var(--green); }
+.print-record dd.negative { color: var(--red); }
+@media (max-width: 800px) { .print-workspace { grid-template-columns: 1fr; } .print-record dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; } }
+
+.print-capture-stage { position: fixed; inset: 0 auto auto -12000px; width: 1200px; min-height: 840px; overflow: hidden; opacity: 0; pointer-events: none; z-index: -1; }
+.print-artifact-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; }
+.print-artifact-status p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.print-artifact-status time { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.print-saved-image { padding: 18px; }
+.print-saved-image img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.trade-print-artifact { display: grid; gap: 12px; margin-top: 16px; }
+@media (max-width: 620px) { .print-artifact-status { align-items: flex-start; flex-direction: column; } }

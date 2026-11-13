@@ -1,9 +1,10 @@
 import type { Trade } from '../types'
+import { forexPnl } from './trade'
 
 export type PrintCandle = { time: string; open: number; high: number; low: number; close: number }
 export type PrintChartSource = 'mt5_candles' | 'twelve_data_candles'
-export type PrintChartMarker = { time: string; action: 'Buy' | 'Sell'; price: number; lots: number; precision: 'minute' }
-export type PrintChartSpec = { version: 1; pair: Trade['pair']; brokerSymbol?: string; source: PrintChartSource; sourceRetrievedAt: string; interval: '1m'; quality: 'complete' | 'partial'; candles: PrintCandle[]; markers: PrintChartMarker[] }
+export type PrintChartMarker = { time: string; action: 'Buy' | 'Sell'; role: 'Entry' | 'Exit'; price: number; lots: number; precision: 'minute' }
+export type PrintChartSpec = { version: 1; pair: Trade['pair']; direction: Trade['side']; netPnl: number; brokerSymbol?: string; source: PrintChartSource; sourceRetrievedAt: string; interval: '1m'; quality: 'complete' | 'partial'; candles: PrintCandle[]; markers: PrintChartMarker[] }
 
 const minuteMs = 60_000
 const maxTradeMs = 72 * 60 * minuteMs
@@ -35,10 +36,10 @@ export function buildPrintChart(trade: Trade, candles: PrintCandle[], source: Pr
     const time = `${fill.date ?? trade.date}T${fill.time}:00`
     const ms = parseMinute(time)
     if (ms < start || ms > end || !['Buy', 'Sell'].includes(fill.action) || !Number.isFinite(fill.price) || fill.price <= 0 || !Number.isFinite(fill.lots) || fill.lots <= 0) throw new Error('Recorded execution is invalid.')
-    return { time, action: fill.action, price: fill.price, lots: fill.lots, precision: 'minute' }
+    return { time, action: fill.action, role: fill.action === (trade.side === 'Long' ? 'Buy' : 'Sell') ? 'Entry' : 'Exit', price: fill.price, lots: fill.lots, precision: 'minute' }
   }).sort((a, b) => a.time.localeCompare(b.time))
   const tradeCandles = sorted.filter((c) => c.ms >= start && c.ms <= end)
   const hasGaps = tradeCandles.some((c, i) => i > 0 && c.ms - tradeCandles[i - 1].ms > minuteMs)
   const complete = tradeCandles.length > 0 && tradeCandles[0].ms === start && tradeCandles[tradeCandles.length - 1].ms === end && !hasGaps
-  return { version: 1, pair: trade.pair, ...(trade.brokerSymbol ? { brokerSymbol: trade.brokerSymbol } : {}), source, sourceRetrievedAt, interval: '1m', quality: complete ? 'complete' : 'partial', candles: sorted.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })), markers }
+  return { version: 1, pair: trade.pair, direction: trade.side, netPnl: forexPnl(trade).netPnl, ...(trade.brokerSymbol ? { brokerSymbol: trade.brokerSymbol } : {}), source, sourceRetrievedAt, interval: '1m', quality: complete ? 'complete' : 'partial', candles: sorted.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })), markers }
 }
