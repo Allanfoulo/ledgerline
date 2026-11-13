@@ -60,6 +60,10 @@ export const importDeals = internalMutation({ args: { hash: v.string(), brokerKe
     if (knownSources.has(sourceKey) || manualFills.has(fingerprint)) { duplicates++; continue }
     const tradeId = await ctx.db.insert('journalTrades', { owner: token.owner, accountId: token.accountId, sourceKey, ...(brokerSymbol ? { brokerSymbol } : {}), fingerprint, ...trade })
     for (const execution of executions) await ctx.db.insert('tradeExecutions', { owner: token.owner, accountId: token.accountId, tradeId, ...execution })
+    // Queue durable work in the same transaction; no provider or renderer runs here.
+    const createdAt = Date.now()
+    const printId = await ctx.db.insert('tradePrints', { owner: token.owner, accountId: token.accountId, tradeId, origin: 'mt5', timePrecision: 'minute', status: 'pending_chart', createdAt, schemaVersion: 1 })
+    await ctx.db.insert('printJobs', { owner: token.owner, accountId: token.accountId, tradeId, printId, status: 'queued', createdAt, schemaVersion: 1 })
     knownSources.add(sourceKey); inserted++
   }
   return { inserted, duplicates }

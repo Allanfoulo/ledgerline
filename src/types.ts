@@ -12,6 +12,7 @@ export type Trade = {
   brokerSymbol?: string
   source?: 'sample' | 'real'
   historicalAligned?: boolean
+  printStatus?: 'pending_chart'
   id: string
   date: string
   exitDate?: string

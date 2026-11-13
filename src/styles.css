@@ -620,3 +620,11 @@ textarea::placeholder, input::placeholder { color: #637167; }
 .skip-link { position: fixed; z-index: 1000; top: 8px; left: 8px; padding: 10px 14px; color: #102016; background: #a8e2ba; border-radius: var(--radius-sm); transform: translateY(-160%); }
 .skip-link:focus { transform: translateY(0); }
 .main-area:focus { outline: none; }
+
+.print-setup-wrap { padding-bottom: 0; }
+.print-backfill { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 15px 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.print-backfill strong { color: var(--text); font-size: 13px; }
+.print-backfill p { max-width: 65ch; margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.print-backfill > p[role="status"] { flex-basis: 100%; }
+.print-status { color: var(--muted); font-size: 10px; font-weight: 600; }
+:root[data-theme="light"] .print-status { color: #52675a; }
