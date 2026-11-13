@@ -4,7 +4,7 @@ import { forexPnl, tradeFingerprint, validateTrade } from '../src/domain/trade'
 import type { TradeInput } from '../src/domain/trade'
 import { parseCsv, previewCsv, suggestMapping } from '../src/application/tradeImport'
 import { saveTrades } from '../src/application/journal'
-import { closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles, weekendSuggestion } from '../src/domain/backtest'
+import { closeAllPositions, closePosition, completedCandles, hasRepeatedPrices, openPosition, replayCandles, weekendSuggestion } from '../src/domain/backtest'
 import { groupPerformance } from '../src/domain/report'
 import { alignSamples, tradeSignature } from '../src/application/alignSamples'
 import type { Trade } from '../src/types'
@@ -127,4 +127,17 @@ test('sample alignment uses exact candle opens, skips aligned trades and preserv
   assert.deepEqual(result, { attempted: 2, completed: 1, failed: 1 }); assert.equal(saved.length, 1); assert.equal(waits, 1)
   const skipped = await alignSamples({ candles: async () => { throw new Error('should not fetch') }, save: async () => {}, wait: async () => {} }, [sample], { 'fx-a': { tradeId: 'fx-a', signature: tradeSignature(sample), entry: 1.1, exit: 1.2 } }, () => {})
   assert.equal(skipped.attempted, 0)
+})
+
+
+test('backtest closes multiple independent long and short positions with commission per position', () => {
+  const positions = [openPosition('Long', 0.5, 1.1, '08:00'), openPosition('Short', 1, 1.101, '08:01')]
+  const closed = closeAllPositions(positions, '2026-11-02', 'EUR/USD', 1.102, '08:02', 2)
+  assert.equal(closed.length, 2)
+  assert.deepEqual(closed.map((trade) => [trade.side, trade.lots, trade.commission]), [['Long', 0.5, 2], ['Short', 1, 2]])
+  assert.ok(Math.abs(forexPnl(closed[0]).netPnl - 98) < 1e-6)
+  assert.ok(Math.abs(forexPnl(closed[1]).netPnl - (-102)) < 1e-6)
+  assert.throws(() => closeAllPositions(positions, '2026-11-02', 'EUR/USD', 1.102, '08:01', 2))
+  assert.equal(positions.length, 2)
+  assert.throws(() => closeAllPositions(positions, '2026-11-02', 'EUR/USD', 1.102, '08:02', -1))
 })

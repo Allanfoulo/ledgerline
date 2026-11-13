@@ -15,6 +15,7 @@
     "@convex-dev/auth": "^0.0.96",
     "convex": "^1.49.0",
     "lightweight-charts": "^5.2.1",
+    "lightweight-charts-drawing": "0.6.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

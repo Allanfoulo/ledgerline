@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CandlestickSeries, ColorType, createChart } from 'lightweight-charts'
-import type { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts'
+import { CandlestickSeries, ColorType, createChart, createSeriesMarkers } from 'lightweight-charts'
+import type { IChartApi, ISeriesApi, ISeriesMarkersPluginApi, SeriesMarker, UTCTimestamp, Time } from 'lightweight-charts'
+import { DrawingManager } from 'lightweight-charts-drawing'
+import type { DrawingKind } from 'lightweight-charts-drawing'
 import { replayCandles } from './domain/backtest'
+import type { OpenPosition } from './domain/backtest'
+import type { TradeInput } from './domain/trade'
 
 type Candle = { time: string; open: number; high: number; low: number; close: number }
 
-export default function BacktestChart({ candles, index, pair, interval, children }: { candles: Candle[]; index: number; pair: string; interval: number; children: ReactNode }) {
+export default function BacktestChart({ candles, index, pair, interval, date, positions, trades, canEnter, onBuy, onSell, onPause, children }: { candles: Candle[]; index: number; pair: string; interval: number; date: string; positions: OpenPosition[]; trades: TradeInput[]; canEnter: boolean; onBuy: () => boolean; onSell: () => boolean; onPause: () => void; children: ReactNode }) {
   const shell = useRef<HTMLDivElement>(null)
   const container = useRef<HTMLDivElement>(null)
   const chart = useRef<IChartApi | null>(null)
@@ -14,6 +18,18 @@ export default function BacktestChart({ candles, index, pair, interval, children
   const [fullScreen, setFullScreen] = useState(false)
   const [fallback, setFallback] = useState(false)
   const [hovered, setHovered] = useState<Candle | null>(null)
+  const [tool, setTool] = useState<DrawingKind | 'buy' | 'sell' | null>(null)
+  const [drawingCount, setDrawingCount] = useState(0)
+  const [selectedCount, setSelectedCount] = useState(0)
+  const [canUndo, setCanUndo] = useState(false)
+  const [drawingMessage, setDrawingMessage] = useState('')
+  const toolRef = useRef<DrawingKind | 'buy' | 'sell' | null>(null)
+  const tradeActions = useRef({ onBuy, onSell, canEnter })
+  tradeActions.current = { onBuy, onSell, canEnter }
+  const drawings = useRef<DrawingManager | null>(null)
+  const history = useRef<string[]>([])
+  const restoring = useRef(false)
+  const markerApi = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
 
   useEffect(() => {
     if (!container.current) return
@@ -21,6 +37,31 @@ export default function BacktestChart({ candles, index, pair, interval, children
     chart.current = instance
     series.current = instance.addSeries(CandlestickSeries, { upColor: '#8dd8a4', downColor: '#e8998e', wickUpColor: '#8dd8a4', wickDownColor: '#e8998e', borderVisible: false, priceFormat: { type: 'price', precision: pair === 'XAU/USD' ? 3 : 5, minMove: pair === 'XAU/USD' ? 0.001 : 0.00001 } })
     const candleSeries = series.current
+    markerApi.current = createSeriesMarkers(candleSeries, [])
+    const manager = new DrawingManager(instance, candleSeries, { magnet: 'off', stayInDrawingMode: false })
+    drawings.current = manager
+    history.current = [manager.exportJSON()]
+    const checkpoint = () => {
+      if (restoring.current) return
+      const snapshot = manager.exportJSON()
+      if (history.current.at(-1) !== snapshot) history.current = [...history.current.slice(-99), snapshot]
+      setCanUndo(history.current.length > 1)
+    }
+    manager.on('change', (items) => setDrawingCount(items.length))
+    manager.on('selection', (ids) => setSelectedCount(ids.length))
+    manager.on('add', checkpoint)
+    manager.on('remove', checkpoint)
+    manager.on('gestureEnd', checkpoint)
+    manager.on('tool', (kind) => { toolRef.current = kind; setTool(kind); if (!kind) setDrawingMessage('') })
+    instance.subscribeClick((event) => {
+      if (!toolRef.current || !event.point || typeof event.time !== 'number') return
+      if (toolRef.current === 'buy' || toolRef.current === 'sell') {
+        if (!tradeActions.current.canEnter) return
+        const opened = toolRef.current === 'buy' ? tradeActions.current.onBuy() : tradeActions.current.onSell()
+        toolRef.current = null; setTool(null); setDrawingMessage(opened ? 'Simulated position opened at the current replay price.' : 'Could not open the simulated position. Check the session message.')
+        return
+      }
+    })
     const applyTheme = () => {
       const light = document.documentElement.dataset.theme === 'light'
       instance.applyOptions({ layout: { background: { type: ColorType.Solid, color: light ? '#f9fcf7' : '#131a15' }, textColor: light ? '#405d48' : '#c0cec3' }, grid: { vertLines: { color: light ? '#e5ede3' : '#243128' }, horzLines: { color: light ? '#e5ede3' : '#243128' } }, rightPriceScale: { borderColor: light ? '#d0ded0' : '#344239' } })
@@ -34,7 +75,7 @@ export default function BacktestChart({ candles, index, pair, interval, children
       if (!event.time || !value || !('open' in value) || typeof event.time !== 'number') { setHovered(null); return }
       setHovered({ time: new Date(event.time * 1000).toISOString().slice(0, 19), open: value.open, high: value.high, low: value.low, close: value.close })
     })
-    return () => { themeObserver.disconnect(); instance.remove(); chart.current = null; series.current = null }
+    return () => { themeObserver.disconnect(); manager.destroy(); drawings.current = null; history.current = []; markerApi.current?.detach(); markerApi.current = null; instance.remove(); chart.current = null; series.current = null }
   }, [pair])
 
   useEffect(() => {
@@ -44,12 +85,31 @@ export default function BacktestChart({ candles, index, pair, interval, children
   }, [candles, index, pair, interval])
 
   useEffect(() => {
+    const toBucket = (time: string) => (Math.floor(Date.parse(`${date}T${time}:00Z`) / (interval * 60000)) * interval * 60) as UTCTimestamp
+    const markers: SeriesMarker<Time>[] = []
+    const add = (time: string, side: 'Long' | 'Short', entry: boolean) => {
+      const isBuy = (side === 'Long') === entry
+      markers.push({ time: toBucket(time), position: isBuy ? 'belowBar' : 'aboveBar', color: isBuy ? '#2b8652' : '#bd5950', shape: isBuy ? 'arrowUp' : 'arrowDown', text: `${isBuy ? 'Buy' : 'Sell'}${entry ? '' : ' · close'}` })
+    }
+    for (const trade of trades) { add(trade.entryTime, trade.side, true); add(trade.exitTime, trade.side, false) }
+    for (const position of positions) add(position.entryTime, position.side, true)
+    markers.sort((a, b) => Number(a.time) - Number(b.time))
+    markerApi.current?.setMarkers(markers)
+  }, [date, interval, pair, positions, trades])
+
+  useEffect(() => {
     const onChange = () => setFullScreen(document.fullscreenElement === shell.current)
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setFallback(false) }
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') { setFallback(false); if (toolRef.current === 'buy' || toolRef.current === 'sell') { toolRef.current = null; setTool(null); setDrawingMessage('') } } }
     document.addEventListener('fullscreenchange', onChange)
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('fullscreenchange', onChange); document.removeEventListener('keydown', onKeyDown) }
   }, [])
+
+  useEffect(() => {
+    if (!canEnter && (toolRef.current === 'buy' || toolRef.current === 'sell')) {
+      toolRef.current = null; setTool(null); setDrawingMessage('')
+    }
+  }, [canEnter])
 
   const zoom = (factor: number) => {
     const scale = chart.current?.timeScale()
@@ -67,6 +127,30 @@ export default function BacktestChart({ candles, index, pair, interval, children
     chart.current?.priceScale('right').applyOptions({ autoScale: true })
   }
 
+  const chooseTool = (selected: 'trend-line' | 'horizontal-line' | 'rectangle' | 'buy' | 'sell') => {
+    const next = toolRef.current === selected ? null : selected
+    drawings.current?.setTool(next === 'buy' || next === 'sell' ? null : next)
+    toolRef.current = next; setTool(next)
+    if (next === 'buy' || next === 'sell') onPause()
+    setDrawingMessage(next === 'trend-line' ? 'Select two points to draw a trend line.' : next === 'horizontal-line' ? 'Select a price to place a horizontal level.' : next === 'rectangle' ? 'Select two corners to draw a rectangle.' : next ? `Click a candle to ${next} at the current replay open.` : '')
+  }
+
+  const undoDrawing = () => {
+    const manager = drawings.current
+    if (!manager || history.current.length < 2) return
+    restoring.current = true
+    try { history.current.pop(); manager.setTool(null); manager.importJSON(history.current[history.current.length - 1]); manager.select([]) }
+    finally { restoring.current = false }
+    setCanUndo(history.current.length > 1); setDrawingCount(manager.drawings().length); setSelectedCount(0); setDrawingMessage('Last drawing change undone.')
+  }
+
+  const deleteSelected = () => {
+    const manager = drawings.current
+    if (!manager) return
+    for (const id of [...manager.selection()]) manager.remove(id)
+    setDrawingMessage('Selected drawing removed.')
+  }
+
   const toggleFullScreen = async () => {
     if (fallback) { setFallback(false); return }
     if (document.fullscreenElement === shell.current) { await document.exitFullscreen(); return }
@@ -80,6 +164,16 @@ export default function BacktestChart({ candles, index, pair, interval, children
   const displayed = hovered ?? replayCandles(candles, index, interval).at(-1)
   const precision = pair === 'XAU/USD' ? 3 : 5
   return <div ref={shell} className={`backtest-chart-shell${expanded ? ' is-expanded' : ''}${fallback ? ' fullscreen-fallback' : ''}`}>
+    <div className="backtest-drawing-tools" role="group" aria-label="Chart drawing tools">
+      <button className="button button-quiet" type="button" disabled={!canEnter} aria-pressed={tool === 'buy'} onClick={() => chooseTool('buy')}>Buy</button>
+      <button className="button button-quiet" type="button" disabled={!canEnter} aria-pressed={tool === 'sell'} onClick={() => chooseTool('sell')}>Sell</button>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'trend-line'} onClick={() => chooseTool('trend-line')}>Trend line</button>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'horizontal-line'} onClick={() => chooseTool('horizontal-line')}>Horizontal level</button>
+      <button className="button button-quiet" type="button" aria-pressed={tool === 'rectangle'} onClick={() => chooseTool('rectangle')}>Rectangle</button>
+      <button className="button button-quiet" type="button" disabled={!selectedCount} onClick={deleteSelected}>Delete selected</button>
+      <button className="button button-quiet" type="button" disabled={!canUndo} onClick={undoDrawing}>Undo</button>
+      <span role="status">{drawingMessage || `${drawingCount} ${drawingCount === 1 ? 'drawing' : 'drawings'} · Drawings last for this session`}</span>
+    </div>
     <div className="backtest-chart-toolbar" role="group" aria-label="Chart view controls">
       <button className="button button-quiet" type="button" onClick={() => zoom(1.4)} aria-label="Zoom out">−</button>
       <button className="button button-quiet" type="button" onClick={() => zoom(1 / 1.4)} aria-label="Zoom in">+</button>
