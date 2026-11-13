@@ -158,3 +158,8 @@ Controls and panels use restrained 5–9px corners; larger containers cap at 12p
 SidePrint is a personal trading journal and performance-review workspace. Its mark uses three record lines, with a longer middle line, in a mint enclosure. The mark represents a record rather than an investment outcome. Brand mint is distinct from the semantic colors used to communicate profit and loss.
 
 The signed-out introduction uses “The result isn't the whole story” and “Every trade leaves a print.” Product screens prioritize real data, clear state and restrained visual hierarchy. Do not add fabricated trading outcomes, decorative paper texture behind data, or claims of trade execution. The working name is provisional.
+
+
+## Shared implementation tokens
+
+Dark and light themes define the same semantic CSS variables: `--bg`, `--surface`, `--surface-raised`, `--surface-soft`, `--line`, `--line-soft`, `--text`, `--muted`, `--green`, `--green-strong`, `--red` and `--amber`. Components should use them for shared surface, text and outcome roles, while charts and other specialized states may need their own explicit theme variants. `--radius-sm`, `--radius-md` and `--radius-lg` encode the existing corner scale. New controls should provide a visible keyboard focus indicator and at least a 24px target; use 44px for touch controls where the layout allows it.

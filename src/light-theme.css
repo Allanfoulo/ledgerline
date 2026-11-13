@@ -101,3 +101,5 @@
 }
 
 :root[data-theme="light"] .brand-copy small { color: #52675a; }
+
+:root[data-theme="light"] :is(.account-copy span, .nav-count, .sidebar-section-label, .sidebar-footnote, .nav-item, .tab-count) { color: #52675a; }
