@@ -18,13 +18,13 @@ Tests must cover repeated import, source/manual collisions, token expiration, ow
 
 Implemented locally: transactional MT5 trade, fill, Print and queued-job creation; owner-scoped listing; explicit 100-trade-page backfill; pending-chart list/detail labels. The UI feature flag `VITE_TRADE_PRINTS_ENABLED` defaults off and must only be enabled after the matching schema and backend functions are deployed together. The UI flag does not disable backend record creation after backend deployment. No scheduled worker consumes queued jobs. Existing real MT5 trades are not modified until the user explicitly runs backfill; each click processes one bounded page and reruns are safe. Sample, manual and CSV trades do not get MT5 Prints in this first slice.
 
-Verification: 34 Node tests pass, including repeat sync, 100 positions, original gold symbol, partial fills, expired token, owner isolation, and repeatable backfill. A full Vite build with an existing Convex URL and UI flag enabled passes. Synthetic browser checks confirmed pending labels in list and detail and a two-page backfill presentation, including a 390px layout. These use fake adapters; a real isolated Convex deployment, concurrent Convex transactions and backend deployment have not been tested. The app was not deployed and no existing records were backfilled.
+Verification: 34 Node tests pass, including repeat sync, 100 positions, original gold symbol, partial fills, expired token, owner isolation, and repeatable backfill. A full Vite build with an existing Convex URL and UI flag enabled passes. Synthetic browser checks confirmed pending labels in list and detail and a two-page backfill presentation, including a 390px layout. M2 and M3 schemas/functions were later deployed to the shared development deployment; live MT5 synchronization, concurrent Convex transactions and authenticated UI review remain unverified. The app was not deployed and no existing records were backfilled.
 
 Rollback: turn off the frontend feature flag; keep the additive tables and existing data intact. Revert the connector mutation to stop creating new records if the backend must be rolled back. Do not delete tables or records. Validate rollback and forward migrations in an isolated deployment before release.
 
 Next: review M1 and approve M2 source, worker, quota and privacy decisions in `M2_CHART_DESIGN.md`. No PNG/chart worker exists yet.
 
-## M2 chart foundation and capture pipeline (implemented locally; not deployed)
+## M2 chart foundation and capture pipeline (deployed to development; not production)
 
 The user selected MT5 history first and Twelve Data as an optional fallback. `connector/mt5_chart.py` reads a bounded UTC M1 window. The updated `connector/mt5_sync.py` claims up to five queued chart jobs on each synchronization cycle, requests candles from the matching local MT5 account, and submits only the bounded candle window. It never sends a terminal password or executes an order. The server validates the connector token, broker binding, source position and candle window before attaching candles to the owner-scoped Print.
 
@@ -32,7 +32,7 @@ The signed-in app polls ready jobs while open, builds the chart with Lightweight
 
 Read-only local verification against one actual gold position returned 998 candles with partial coverage; no trade details, candles or tokens were uploaded. Synthetic tests cover gaps, duplicate/invalid data, gold suffixes, UTC rollover and multiple fills. Synthetic browser checks cover both themes and the integrated Twelve Data fallback path.
 
-This pipeline is implemented in the local feature branch only. It uses two-minute acquisition/render leases and up to three attempts; unavailable MT5 history becomes an explicit `needs_data` state. The connector processes at most five jobs per cycle. The app polls every 15 seconds and captures while the account owner is signed in. If the app is closed, candles remain queued for capture until the owner opens the app again. This is not a server-side renderer. The optional Twelve Data fallback is not connected to this worker.
+M2's Convex schema and functions were deployed from `feature/sideprint-print-charts` to development deployment `dev/allanfoulo` on 2026-11-14. The code uses two-minute acquisition/render leases and up to three attempts; unavailable MT5 history becomes an explicit `needs_data` state. The connector processes at most five jobs per cycle. The app polls every 15 seconds and captures while the account owner is signed in. If the app is closed, candles remain queued for capture until the owner opens the app again. This is not a server-side renderer. The optional Twelve Data fallback is not connected to this worker. The deployment was not followed by a live MT5 sync or authenticated UI verification; production was not changed.
 
 ## Reference-inspired chart workspace
 
@@ -44,12 +44,12 @@ The optional PNG compositor includes the chart, direction, net P&L, recorded fil
 
 Current implementation update: automatic MT5 candle transfer and browser capture are wired locally; see [M2 automatic Trade Print capture](M2_AUTOMATION_IMPLEMENTATION.md). This newer implementation note supersedes the earlier pending-capture paragraph above.
 
-## M3 execution plans (implemented locally; not deployed)
+## M3 execution plans (deployed to development; not production)
 
 Commit `9179f66` on the dedicated branch `feature/sideprint-execution-plans` adds a five-section Guided flow and a Quick form over one typed plan structure. Optional account binding is checked against Convex Auth ownership. Draft writes and commits use an optimistic revision number; commit records server time and inserts an immutable original version. Later changes append a version with a reason and link to the previous version. Existing snapshots have no update mutation. Cancellation and expiry require a reason and do not create trades or P&L.
 
 Risk is recorded as a USD maximum loss and/or an account percentage, with optional user-entered protective stop and size notes. No sizing is calculated. Confirmations are user-authored; empty confirmation lists are allowed, with no fixed count. Verified-source confirmations are rejected until a trusted evidence source is implemented. The UI discloses that an unlinked plan timestamp does not prove it predates a trade. `VITE_EXECUTION_PLANS_ENABLED` defaults off and should only be enabled after matching Convex functions and schema are deployed together.
 
-Verification on this branch: app and Convex TypeScript no-emit checks pass; the in-memory test runner passes 43 tests, including five plan tests for validation, account ownership, stale writes, immutable revisions and closure reasons. Vite production bundling passes in memory. The standard `npm test` script cannot create its `.tmp` folder in this restricted worktree, and the full production build cannot write its output; live Convex migrations, signed-in browser review and deployment have not been performed.
+Verification on this branch: app and Convex TypeScript no-emit checks pass; the in-memory test runner passes 43 tests, including five plan tests for validation, account ownership, stale writes, immutable revisions and closure reasons. Vite production bundling passes in memory. The standard `npm test` script cannot create its `.tmp` folder in this restricted worktree, and the full production build cannot write its output. The M3 schema/functions were deployed to `dev/allanfoulo`; live MT5 sync, data backfill, signed-in browser review and production deployment were not performed.
 
 Next milestone: M4 Plan-to-Print linking, Print Review and deterministic Review Queue, on a new feature branch. Keep M5+ features isolated on subsequent branches.
