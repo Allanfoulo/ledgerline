@@ -540,3 +540,30 @@ textarea::placeholder, input::placeholder { color: #637167; }
 .backtest-positions { margin: 1rem 0; }
 .backtest-positions-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
 .backtest-positions .trade-table button { white-space: nowrap; }
+
+/* SidePrint: calm, legible working surfaces for reviewing a trading record. */
+.brand-symbol { flex: 0 0 32px; width: 32px; height: 32px; transform: none; background: none; }
+.brand-symbol rect { fill: #a8e2ba; }
+.brand-symbol path { fill: none; stroke: #17251c; stroke-width: 2.5; stroke-linecap: round; }
+.brand-period { color: var(--green-strong); }
+.auth-brand .brand-copy strong { font-size: 20px; }
+.auth-intro-content > p { max-width: 410px; }
+.auth-features { border-top: 1px solid var(--line); padding-top: 25px; }
+.auth-features strong { font-size: 13px; }
+.record-label { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.detail-columns + .replay-panel, .detail-columns + .replay-section { margin-top: 14px; }
+:where(.trade-table, .metric-value, .detail-breakdown, .detail-pnl, .calendar-grid) { font-variant-numeric: tabular-nums; }
+:where(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--green-strong); outline-offset: 3px; }
+@media (max-width: 620px) {
+  html, body { min-width: 320px; }
+  .auth-intro { padding-top: 22px; }
+  .auth-intro-content { padding: 28px 0 8px; }
+  .auth-intro h1 { font-size: clamp(31px, 9vw, 38px); margin: 12px 0; }
+  .auth-content { padding-top: 28px; }
+  .page-heading p, .panel-heading p { font-size: 11px; }
+  .metric-detail { font-size: 9px; }
+  .sidebar .primary-nav { scrollbar-width: thin; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

@@ -5,7 +5,7 @@ export default function ThemeToggle() {
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
-    try { localStorage.setItem('ledgerline-theme', next) } catch { /* Theme still works for this session. */ }
+    try { localStorage.setItem('sideprint-theme', next) } catch { /* Theme still works for this session. */ }
     setTheme(next)
   }
   return <button type="button" className="theme-toggle" onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
