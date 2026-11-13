@@ -555,7 +555,7 @@ textarea::placeholder, input::placeholder { color: #637167; }
 :where(.trade-table, .metric-value, .detail-breakdown, .detail-pnl, .calendar-grid) { font-variant-numeric: tabular-nums; }
 :where(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--green-strong); outline-offset: 3px; }
 @media (max-width: 620px) {
-  html, body { min-width: 320px; }
+  html, body { min-width: 0; }
   .auth-intro { padding-top: 22px; }
   .auth-intro-content { padding: 28px 0 8px; }
   .auth-intro h1 { font-size: clamp(31px, 9vw, 38px); margin: 12px 0; }
@@ -566,4 +566,33 @@ textarea::placeholder, input::placeholder { color: #637167; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Shared workspace hierarchy keeps forms and review data easy to scan. */
+.workspace-section { padding: 22px; }
+.workspace-section > h2, .report-results > h2 { color: var(--text); font-family: var(--font-display); font-size: 16px; font-weight: 650; letter-spacing: -.02em; }
+.workspace-section > p, .report-results > p { max-width: 72ch; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.workspace-section > h2 + p { margin: 6px 0 20px; }
+.workspace-section .editor-form, .workspace-section .editor-fields { gap: 15px; }
+.workspace-section :is(.editor-form label, .editor-fields label, .mapping-grid label, .file-label, .strategy-select), .settings-panel label { font-size: 12px; line-height: 1.4; }
+.workspace-section :is(input:not([type=checkbox]), select), .settings-panel :is(input:not([type=checkbox]), select) { min-height: 40px; }
+.workspace-section .duplicate-choice { font-size: 11px; }
+.report-results { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.report-results .trade-table :is(th:not(:first-child), td:not(:first-child)) { text-align: right; font-variant-numeric: tabular-nums; }
+.settings-panel { display: flex; flex-direction: column; max-width: 720px; padding: 24px; font-size: 12px; }
+.settings-panel > .settings-form { width: 100%; margin: 0; padding: 22px 0; border: 0; border-bottom: 1px solid var(--line); }
+.settings-panel > .settings-form:first-child { padding-top: 0; }
+.settings-panel > .settings-form:last-child { border-bottom: 0; padding-bottom: 0; }
+.settings-panel .settings-form p { max-width: 65ch; line-height: 1.6; }
+.notebook-empty { margin: 0; padding: 24px 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.note-entry-copy strong { font-size: 12px; }
+.note-entry-copy small { font-size: 10px; }
+.replay-panel .replay-notice, .replay-panel .replay-hint { font-size: 12px; line-height: 1.55; }
+@media (max-width: 620px) {
+  .workspace-section, .settings-panel { padding: 16px; }
+  .topbar { height: auto; min-height: 58px; gap: 8px; }
+  .topbar-actions { justify-content: flex-end; flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+  .dataset-picker select { max-width: 125px; }
+  .workspace-section .editor-form, .workspace-section .editor-fields, .mapping-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
+  .note-entry-copy strong { font-size: 11px; }
 }

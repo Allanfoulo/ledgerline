@@ -11,8 +11,8 @@ The product is a personal trading journal and performance-review workspace, not 
 
 ## Current checkpoint
 
-- Completed: initial identity, auth, shell branding, dashboard heading, trade-detail ordering, favicon, theme preference migration and shared visual refinements.
-- Verified: build, JavaScript and MT5 test suites; signed-out sign-up/sign-in/recovery navigation; sample dashboard and trade detail in browser. Auth and sample dashboard captures are in `docs/sideprint-screenshots/`.
-- Remaining: full screen-by-screen design pass for import, notebook, strategies, reports, replay, backtest and settings; real-account interaction checks; responsive captures at the specified widths; keyboard/contrast audit; before/after capture matrix. The source styles retain many hard-coded theme values which the Impeccable detector flagged for review.
+- Completed: SidePrint identity, auth, shell, dashboard, trade review and detail, and a shared layout/readability pass for notebook, manual entry and CSV, strategies, reports, replay, backtesting and settings. Theme preference remains backward compatible; the settings and header controls stay in sync.
+- Verified: `npm run build`, 31 JavaScript tests and 4 MT5 normalization tests. Browser checks used synthetic sample trades for dashboard, trade detail and reports, and an isolated settings fixture for theme controls. Sign-up, sign-in and recovery forms were opened without submitting credentials. At 320 and 390 CSS pixels the sample dashboard had no document-level horizontal overflow and the bottom navigation remained fixed during scroll; width/overflow was also checked at 768, 1024 and 1440 pixels. Captures are in `docs/sideprint-screenshots/`.
+- Remaining QA: the entire authenticated flow (including manual/CSV saves, strategies, live historical replay, practice-session save and MT5 token actions) was not exercised end to end against a real account. The full before/after and responsive capture matrix, keyboard and contrast audit remain incomplete. The Impeccable detector returned 376 advisory findings, largely inherited hard-coded design values; they need manual review.
 - Existing portability limitation: the MT5 command displays an installation-specific path; a warning was added, but a cross-platform connector setup has not been implemented.
-- No deployment or backend/schema change was performed for this redesign.
+- No deployment, backend schema, trading formula or connector logic change was performed for this redesign. The branch remains local until publication is explicitly authorized.

@@ -50,7 +50,7 @@ export default function Replay({ trade }: { trade: TradeWithPnl }) {
   const candleWidth = Math.max(1, Math.min(8, 500 / Math.max(candles.length, 1)))
 
   return <section className="panel replay-panel" aria-label="Trade replay">
-    <div className="panel-heading"><div><h2>Trade replay</h2><p>Historical one-minute candles · times in UTC</p></div></div>
+    <div className="panel-heading"><div><h2>Historical replay</h2><p>Review the trade using one-minute candles · times in UTC</p></div></div>
     <div className="replay-body">
       <p className="replay-notice">{trade.source === 'real' ? 'Your fills come from the trade you entered. Broker prices may differ from the historical data provider.' : trade.historicalAligned ? 'Sample fills use the open of matching historical one-minute candles.' : 'This sample trade has invented fills. To align it with historical prices, use Align sample trades in Settings.'} One-minute candles do not show movement within each minute.</p>
       <div className="replay-load"><button className="button button-primary" onClick={loadCandles} disabled={loading}>{loading ? 'Loading…' : 'Load historical candles'}</button></div>
