@@ -1,6 +1,6 @@
 # M4: Plan links, Print reviews, and Review Queue
 
-**Status:** Approved design; awaiting user review before implementation.
+**Status:** User-approved and implemented on `feature/sideprint-m4-review`; schema/functions deployed to development only.
 
 **Branch:** `feature/sideprint-m4-review`
 **Baseline:** `feature/sideprint-dox` at `e884877`
@@ -15,7 +15,7 @@ The interface follows the existing SidePrint design system in `DESIGN.md`: compa
 
 The M3 baseline has owner-scoped `executionPlans` and append-only `executionPlanVersions`; MT5 synchronization creates owner/account-scoped `tradePrints` and `printJobs`. Prints are generated only for MT5 imports. Manual and CSV trades do not have reliable origin metadata. Journal fills and entry timestamps currently carry minute precision. Existing plans may have no account assigned.
 
-M4 applies only to authenticated owner-owned MT5 Trade Prints and real imported executions. It does not infer a link, a plan commitment, rule adherence, or market facts. It does not deploy Convex changes.
+M4 applies only to authenticated owner-owned MT5 Trade Prints and real imported executions. It does not infer a link, a plan commitment, rule adherence, or market facts. The original implementation approval excluded deployment; after implementation, the user separately authorized deployment of the additive M4 schema/functions to `allanfoulo:rea:dev/allanfoulo` (`kindred-fly-71`) on 2026-11-14. Production was not targeted and no records were migrated.
 
 ## Main journeys
 
@@ -86,7 +86,7 @@ Use typed domain concepts for timing classification, candidate ranking, and queu
 - Manual/CSV Trade Print generation or changing MT5 import contracts.
 - Live quotes, broker order placement, edit/delete of imported facts, or backtest/sample reviews.
 - Persistent chart drawings, playbooks, weekly performance reports, AI, public sharing, or new subscription gates.
-- Production or development Convex deployment, migrations, pushing branches, or opening a PR.
+- Production Convex deployment, data migrations/backfill, pushing branches, or opening a PR. The separately approved development deployment is recorded above.
 
 ## Verification and acceptance
 

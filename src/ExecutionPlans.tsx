@@ -10,7 +10,7 @@ type EditMode = 'draft' | 'revision' | 'view'
 const steps = ['Bias', 'Confirmations', 'Invalidation', 'Execution', 'Risk']
 
 function timestamp(value: number) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZoneName: 'short' }).format(new Date(value))
+  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(value))
 }
 
 function accountName(accountId: string | undefined, accounts: Array<{ id: string; name: string }>) {
@@ -31,7 +31,7 @@ function PlanField({ label, hint, children }: { label: string; hint?: string; ch
   return <label className="plan-field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
 }
 
-export default function ExecutionPlans() {
+export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { initialPlanId?: string; onReviewNoTrade?: (planId: string) => void }) {
   const backend = useBackend()
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const data = useConvexExecutionPlans(backend.authenticated, selectedPlanId)
@@ -50,6 +50,10 @@ export default function ExecutionPlans() {
   const loadedPlan = useRef<string | null>(null)
   const active = data.detail?.id === selectedPlanId ? data.detail : undefined
   const latest = active?.versions.at(-1)
+
+  useEffect(() => {
+    if (initialPlanId && data.plans.some((plan) => plan.id === initialPlanId)) setSelectedPlanId(initialPlanId)
+  }, [initialPlanId, data.plans])
 
   useEffect(() => {
     if (!active) return
@@ -263,8 +267,8 @@ export default function ExecutionPlans() {
 
           {editMode === 'view' && active.status === 'committed' && displayedVersion && <div className="plan-version-meta"><strong>Version {displayedVersion.version} · {displayedVersion.kind === 'original' ? 'Original snapshot' : 'Revision'}</strong><time dateTime={new Date(displayedVersion.committedAt).toISOString()}>Committed {timestamp(displayedVersion.committedAt)}</time>{displayedVersion.reason && <p>Revision reason: {displayedVersion.reason}</p>}<p>This plan is not linked to an execution. Its commit time alone does not establish that it was written before a trade.</p></div>}
           {editMode === 'view' && active.status === 'draft' && <div className="plan-version-meta"><strong>Draft · Not committed</strong><p>No frozen version or server commit timestamp exists yet.</p></div>}
-          {editMode === 'view' && active.status === 'cancelled' && <div className="plan-version-meta"><strong>Cancelled · No trade recorded here</strong><p>{active.closeReason}</p></div>}
-          {editMode === 'view' && active.status === 'expired' && <div className="plan-version-meta"><strong>Expired · No trade recorded here</strong><p>{active.closeReason}</p></div>}
+          {editMode === 'view' && active.status === 'cancelled' && <div className="plan-version-meta"><strong>Cancelled · No trade recorded here</strong><p>{active.closeReason}</p>{onReviewNoTrade && <button className="button button-quiet" type="button" onClick={() => onReviewNoTrade(active.id)}>Review no-trade outcome</button>}</div>}
+          {editMode === 'view' && active.status === 'expired' && <div className="plan-version-meta"><strong>Expired · No trade recorded here</strong><p>{active.closeReason}</p>{onReviewNoTrade && <button className="button button-quiet" type="button" onClick={() => onReviewNoTrade(active.id)}>Review no-trade outcome</button>}</div>}
 
           {editMode === 'revision' && <PlanField label="Why is this plan changing?"><textarea value={revisionReason} maxLength={500} rows={2} onChange={(event) => setRevisionReason(event.target.value)}/></PlanField>}
           {editMode === 'view' && (active.status === 'draft' || active.status === 'committed') && <div className="plan-close-controls"><PlanField label="Reason to close this plan"><input maxLength={500} value={closeReason} onChange={(event) => setCloseReason(event.target.value)} placeholder="For example, the setup no longer applies"/></PlanField><button className="button button-quiet" type="button" disabled={busy || !closeReason.trim()} onClick={() => { void closePlan('cancelled') }}>Cancel plan</button><button className="button button-quiet" type="button" disabled={busy || !closeReason.trim()} onClick={() => { void closePlan('expired') }}>Mark expired</button></div>}

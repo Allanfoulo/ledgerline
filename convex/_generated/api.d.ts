@@ -17,6 +17,7 @@ import type * as identity from "../identity.js";
 import type * as journal from "../journal.js";
 import type * as notes from "../notes.js";
 import type * as passwordRecovery from "../passwordRecovery.js";
+import type * as printReviews from "../printReviews.js";
 import type * as prints from "../prints.js";
 import type * as samplePrices from "../samplePrices.js";
 import type * as secrets from "../secrets.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   journal: typeof journal;
   notes: typeof notes;
   passwordRecovery: typeof passwordRecovery;
+  printReviews: typeof printReviews;
   prints: typeof prints;
   samplePrices: typeof samplePrices;
   secrets: typeof secrets;

@@ -12,12 +12,13 @@ const Backtest = lazy(() => import('./Backtest'))
 import ThemeToggle from './ThemeToggle'
 import BrandLockup from './BrandLockup'
 import PrintBackfill from './PrintBackfill'
-import { executionPlansEnabled, tradePrintsEnabled } from './config/features'
+import { executionPlansEnabled, printReviewsEnabled, tradePrintsEnabled } from './config/features'
 import TradePrintCaptureWorker from './TradePrintCaptureWorker'
 import TradePrintArtifact from './TradePrintArtifact'
 import ExecutionPlans from './ExecutionPlans'
+import PrintReviewHub from './PrintReviewHub'
 
-type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest' | 'execution-plans'
+type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest' | 'execution-plans' | 'review-queue'
 type TradesTab = 'Day' | 'Week' | 'All'
 const latestSampleDate = tradeFixtures.map((trade) => trade.date).sort().at(-1) ?? ''
 
@@ -28,6 +29,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     chart: <><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/><path d="M16 7h3v3"/></>,
     book: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5v15A2.5 2.5 0 0 1 7.5 17H20"/><path d="M9 7h7"/></>,
     plan: <><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4"/></>,
+    review: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5v15A2.5 2.5 0 0 1 7.5 17H20"/><path d="m9 10 2 2 4-4"/></>,
     search: <><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></>,
     chevron: <path d="m9 18 6-6-6-6"/>,
     down: <path d="m7 10 5 5 5-5"/>,
@@ -80,6 +82,8 @@ function App() {
   })), [backend.samplePrices])
   const allTrades = useMemo(() => dataset === 'sample' ? sampleTrades : enrichedTrades(backend.realTrades.map((trade) => { const review = backend.reviews.find((item) => item.tradeId === trade.id); const strategy = backend.strategies.find((item) => item.id === review?.strategyId); return strategy ? { ...trade, setup: strategy.name } : trade })), [dataset, sampleTrades, backend.realTrades, backend.reviews, backend.strategies])
   const [page, setPage] = useState<Page>('dashboard')
+  const [initialPlanId, setInitialPlanId] = useState<string | undefined>()
+  const [initialReviewPlanId, setInitialReviewPlanId] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<TradesTab>('All')
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(latestSampleDate)
@@ -132,6 +136,7 @@ function App() {
         <nav className="primary-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === 'dashboard' ? 'active' : ''}`} onClick={() => setPage('dashboard')}><Icon name="grid"/><span>Dashboard</span></button>
           <button className={`nav-item ${page === 'trades' || page === 'detail' ? 'active' : ''}`} onClick={() => { setPage('trades'); setActiveTab('All') }}><Icon name="chart"/><span>Trades</span><span className="nav-count">{allTrades.length}</span></button>
+          {printReviewsEnabled && <button className={`nav-item ${page === 'review-queue' ? 'active' : ''}`} aria-label="Review Queue" onClick={() => { setDataset('real'); setInitialReviewPlanId(undefined); setPage('review-queue') }}><Icon name="review"/><span>Review</span></button>}
           {executionPlansEnabled && <button className={`nav-item ${page === 'execution-plans' ? 'active' : ''}`} onClick={() => setPage('execution-plans')}><Icon name="plan"/><span>Plans</span></button>}
           <button className={`nav-item ${page === 'notes' ? 'active' : ''}`} onClick={() => setPage('notes')}><Icon name="book"/><span>Notebook</span></button>
           <button className={`nav-item ${page === 'manage' ? 'active' : ''}`} onClick={() => setPage('manage')}><Icon name="plus"/><span>Add trades</span></button>
@@ -164,7 +169,8 @@ function App() {
         {page === 'notes' && <Notebook trades={allTrades} dayNoteEdits={currentDayNotes} onSelectDay={selectDay} />}
         {page === 'manage' && <JournalEditor onViewTrades={() => { setDataset('real'); setPage('trades'); setActiveTab('All') }} />}
         {page === 'strategies' && <StrategyPage />}
-        {executionPlansEnabled && page === 'execution-plans' && <ExecutionPlans />}
+        {executionPlansEnabled && page === 'execution-plans' && <ExecutionPlans initialPlanId={initialPlanId} onReviewNoTrade={(planId) => { setInitialReviewPlanId(planId); setPage('review-queue') }} />}
+        {printReviewsEnabled && page === 'review-queue' && <PrintReviewHub authenticated={backend.authenticated} accountId={backend.accountId || undefined} initialPlanId={initialReviewPlanId} onOpenPlans={(planId, accountId) => { setDataset('real'); if (accountId) backend.setAccountId(accountId); setInitialPlanId(planId); setPage('execution-plans') }} />}
         {page === 'reports' && <Reports trades={allTrades} />}
         {page === 'backtest' && <Suspense fallback={<div className="page-content" role="status">Loading backtesting…</div>}><Backtest /></Suspense>}
         {page === 'settings' && <div className="page-content"><PageHeading title="Settings" description="Manage your account and market data connection."/><section className="panel settings-panel">{backend.settings}{backend.error && <p className="replay-error" role="alert">{backend.error}</p>}</section></div>}
@@ -173,7 +179,7 @@ function App() {
   )
 }
 
-function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : page === 'execution-plans' ? 'Execution Plans' : 'Trade detail' }
+function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : page === 'execution-plans' ? 'Execution Plans' : page === 'review-queue' ? 'Review Queue' : 'Trade detail' }
 
 function PageHeading({ title, description, actions }: { title: string; description: string; actions?: React.ReactNode }) {
   return <div className="page-heading"><div><h1>{title}</h1><p>{description}</p></div>{actions && <div className="heading-actions">{actions}</div>}</div>
