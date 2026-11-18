@@ -871,3 +871,42 @@ textarea::placeholder, input::placeholder { color: #637167; }
   .review-fill-row { grid-template-columns: .75fr 1.3fr .7fr .45fr; gap: 4px; font-size: 8px; }
   .review-execution-facts { gap: 0 9px; }
 }
+.plan-images { display: grid; gap: 10px; margin: 16px 0; padding: 14px 0; border-block: 1px solid var(--line); }
+.plan-images h3, .plan-images p { margin: 0; }
+.plan-images p { color: var(--muted); line-height: 1.5; }
+.plan-images label { display: grid; gap: 6px; }
+.plan-image-preview { display: grid; justify-items: start; gap: 8px; }
+.plan-image-preview img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; }
+.provider-key-card { display: grid; gap: 10px; width: 100%; padding: 16px 0; border-top: 1px solid var(--line); }
+.provider-key-card h3, .provider-key-card p { margin: 0; }
+.provider-key-card label { display: grid; gap: 6px; }
+.provider-key-card input { width: 100%; min-height: 40px; padding: 9px 10px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.plan-draft-workspace { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(0, 1.1fr); align-items: start; gap: 20px; }
+.plan-draft-image-column, .plan-draft-fields-column { min-width: 0; }
+.plan-draft-image-column .plan-images { margin-top: 0; }
+.plan-image-controls { display: grid; gap: 12px; }
+.plan-image-controls label { color: var(--text); font-size: 11px; font-weight: 600; }
+.plan-image-controls input[type="file"], .plan-image-controls select { width: 100%; min-height: 40px; padding: 8px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 11px; }
+.plan-image-controls small { color: var(--muted); font-size: 10px; font-weight: 400; line-height: 1.5; }
+.plan-image-consent { padding: 10px 0; border-block: 1px solid var(--line-soft); font-size: 10px; }
+.plan-image-gallery { display: grid; gap: 12px; }
+.plan-image-card { display: grid; min-width: 0; gap: 8px; }
+.plan-image-card .plan-image-preview { width: 100%; }
+.plan-image-card .plan-image-preview img { width: 100%; max-height: 460px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.plan-image-meta { display: grid; gap: 8px; color: var(--muted); font-size: 10px; }
+.plan-image-meta .settings-actions > .button { min-height: 38px; }
+.chart-suggestion-review { display: grid; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-soft); }
+.chart-suggestion-review h4, .chart-suggestion-review p { margin: 0; }
+.chart-suggestion { display: grid; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.chart-suggestion label { display: grid; gap: 5px; color: var(--text); font-size: 10px; font-weight: 600; }
+.chart-suggestion input { width: 100%; min-height: 38px; padding: 8px 9px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.chart-suggestion small, .plan-analysis-provenance { color: var(--muted); font-size: 10px; line-height: 1.55; }
+.plan-image-error { color: var(--red) !important; }
+.plan-strategy-snapshot { display: grid; gap: 4px; padding: 12px 0; border-block: 1px solid var(--line-soft); }
+.plan-strategy-snapshot h4 { margin: 8px 0 0; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.plan-strategy-snapshot p { margin: 0; }
+.plan-price-range { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.plan-price-range legend { padding: 0 5px; color: var(--text); font-size: 11px; font-weight: 600; }
+.plan-price-range > small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+@media (max-width: 1120px) { .plan-draft-workspace { grid-template-columns: 1fr; gap: 8px; } }
+@media (max-width: 620px) { .plan-image-meta .settings-actions { display: grid; grid-template-columns: 1fr; } .chart-suggestion-review { padding: 11px; } .plan-price-range { padding: 10px; } }

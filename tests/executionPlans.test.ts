@@ -8,10 +8,11 @@ function completePlan() {
 }
 
 test('a plan may commit without a fixed number of confirmations and keeps invalidation separate from its stop', () => {
-  const content = { ...completePlan(), protectiveStop: 1.08 }
+  const content = { ...completePlan(), protectiveStop: 1.08, entryRange: { low: 1.07, high: 1.071 }, targetRange: { low: 1.09, high: 1.091 }, invalidationRange: { low: 1.06, high: 1.061 } }
   assert.deepEqual(validateExecutionPlan(content), [])
   assert.equal(content.confirmations.length, 0)
   assert.notEqual(content.invalidationCondition, String(content.protectiveStop))
+  assert.ok(validateExecutionPlan({ ...content, invalidationRange: { low: 1.06 } }).some((error) => error.includes('Invalidation area')))
 })
 
 test('committed plans require a positive max-loss amount or a percentage no greater than 100', () => {
@@ -29,9 +30,20 @@ function mockContext(subject: string | null, accountOwner = 'user-a') {
     db: {
       get: async (id: string) => rows.get(id) ?? null,
       query: (table: string) => ({ withIndex: (_index: string, callback: (query: any) => unknown) => {
-        const query = { gte: () => query, lt: () => query, eq: () => query }
+        const conditions: Array<{ field: string; operation: 'eq' | 'gte' | 'lt'; value: unknown }> = []
+        const query = {
+          gte: (field: string, value: unknown) => { conditions.push({ field, operation: 'gte', value }); return query },
+          lt: (field: string, value: unknown) => { conditions.push({ field, operation: 'lt', value }); return query },
+          eq: (field: string, value: unknown) => { conditions.push({ field, operation: 'eq', value }); return query },
+        }
         callback(query)
-        return { collect: async () => [...rows.values()].filter((row) => row._table === table || (!row._table && table === 'tradingAccounts')) }
+        const matches = () => [...rows.values()].filter((row) => (row._table === table || (!row._table && table === 'tradingAccounts')) && conditions.every(({ field, operation, value }) => {
+          const actual = row[field]
+          if (operation === 'eq') return actual === value
+          if (operation === 'gte') return String(actual) >= String(value)
+          return String(actual) < String(value)
+        }))
+        return { collect: async () => matches(), unique: async () => matches()[0] ?? null }
       } }),
       insert: async (table: string, value: Record<string, unknown>) => {
         const id = `${table}-${++next}`
@@ -82,6 +94,32 @@ test('draft revisions reject stale writes and commit with a server timestamped i
   assert.equal(rows.get(planId)?.latestVersionId, second.versionId)
   assert.equal(writes.filter((write) => write.kind === 'patch' && write.id === original.versionId).length, 0)
   await assert.rejects(() => (revise as any)._handler(ctx, { planId, expectedVersion: 1, reason: 'Stale revision', content: revised }), /newer plan revision/)
+})
+
+test('committed plan revisions snapshot private chart, selected strategy version, and analysis provenance', async () => {
+  const { ctx, rows } = mockContext('user-a')
+  const content = { ...completePlan(), instrument: 'XAU/USD', invalidationRange: { low: 3983.15, high: 3984.5 }, entryRange: { low: 3996.3, high: 4003.8 }, targetRange: { low: 4026.1, high: 4030.1 } }
+  const planId = await (createDraft as any)._handler(ctx, { content })
+  rows.set('strategy', { _id: 'strategy', _table: 'strategies', owner: 'user-a', name: 'ISX', description: 'Structure shifts', rules: ['Wait for S2'] })
+  rows.set('strategy-version', { _id: 'strategy-version', _table: 'strategyVersions', owner: 'user-a', strategyId: 'strategy', version: 1, name: 'ISX', description: 'Structure shifts', rules: ['Wait for S2'], signals: [{ name: 'S1', description: 'Retracement shift' }], committedAt: 1 })
+  rows.set('chart-image', { _id: 'chart-image', _table: 'planImages', owner: 'user-a', planId, storageId: 'storage', previewStorageId: 'preview', mimeType: 'image/png', size: 10, createdAt: 1 })
+  rows.set('analysis', { _id: 'analysis', _table: 'planAnalysisRuns', owner: 'user-a', planId, imageId: 'chart-image', strategyVersionId: 'strategy-version', provider: 'google', model: 'gemma-4-26b-a4b-it', suggestions: { signals: [] }, createdAt: 2 })
+  rows.set('selection', { _id: 'selection', _table: 'planStrategySelections', owner: 'user-a', planId, strategyVersionId: 'strategy-version', analysisRunId: 'analysis' })
+
+  const original = await (commit as any)._handler(ctx, { planId, expectedRevision: 0, content })
+  const committedImages = [...rows.values()].filter((row) => row._table === 'planVersionImages' && row.planVersionId === original.versionId)
+  const committedStrategy = [...rows.values()].find((row) => row._table === 'planVersionStrategies' && row.planVersionId === original.versionId)
+  const committedAnalysis = [...rows.values()].find((row) => row._table === 'planVersionAnalyses' && row.planVersionId === original.versionId)
+  assert.equal(committedImages[0]?.imageId, 'chart-image')
+  assert.equal(committedStrategy?.strategyVersionId, 'strategy-version')
+  assert.equal(committedAnalysis?.analysisRunId, 'analysis')
+  assert.deepEqual(rows.get(original.versionId)?.content.invalidationRange, { low: 3983.15, high: 3984.5 })
+
+  const second = await (revise as any)._handler(ctx, { planId, expectedVersion: 1, reason: 'Clarified the entry area.', content: { ...content, entryRange: { low: 3997, high: 4002 } } })
+  assert.ok([...rows.values()].some((row) => row._table === 'planVersionImages' && row.planVersionId === second.versionId && row.imageId === 'chart-image'))
+  assert.ok([...rows.values()].some((row) => row._table === 'planVersionStrategies' && row.planVersionId === second.versionId && row.strategyVersionId === 'strategy-version'))
+  assert.ok([...rows.values()].some((row) => row._table === 'planVersionAnalyses' && row.planVersionId === second.versionId && row.analysisRunId === 'analysis'))
+  assert.deepEqual(rows.get(original.versionId)?.content.entryRange, { low: 3996.3, high: 4003.8 })
 })
 
 test('plan details and close states stay owner scoped and require a reason', async () => {

@@ -4,6 +4,7 @@ import { useConvexPrintReviews, type NoTradeReviewWorkspace, type TradeReviewWor
 import type { NoTradeReviewContent, ReviewAdherence, ReviewQueueItem, TradePrintReviewContent } from './domain/printReview'
 import { forexPnl } from './domain/trade'
 import TradePrintArtifact from './TradePrintArtifact'
+import { PlanVersionEvidence } from './PlanImages'
 
 type Target = { kind: 'trade'; printId: string } | { kind: 'no_trade'; planId: string }
 
@@ -214,6 +215,7 @@ function TradeReview({ workspace, loading, selectedCandidate, setSelectedCandida
       </section>
     </div>
 
+    {linked && <PlanVersionEvidence versionId={linked.versionId}/>}
     <TradePrintArtifact tradeId={trade.id}/>
 
     <ReviewForm review={review} setReview={setReview} status={workspace.review?.status} revision={workspace.review?.revision ?? 0} versions={workspace.review?.versions ?? []} planLinked={isLinked} busy={busy} onSave={onSave}/>

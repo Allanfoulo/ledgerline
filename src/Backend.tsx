@@ -24,7 +24,7 @@ type Backend = {
   realTrades: Trade[]; tradesLoading: boolean
   strategies: Strategy[]; reviews: StrategyReview[]
   backtests: BacktestSession[]; saveBacktest: (draft: BacktestDraft) => Promise<void>
-  saveStrategy: (id: string | undefined, name: string, rules: string[]) => Promise<void>; saveReview: (tradeId: string, strategyId: string, checked: string[]) => Promise<void>
+  saveStrategy: (id: string | undefined, name: string, description: string, rules: string[]) => Promise<string>; saveReview: (tradeId: string, strategyId: string, checked: string[]) => Promise<void>
   createAccount: (name: string) => Promise<void>; saveTrades: (accountId: string, trades: TradeInput[], allowDuplicates: boolean) => Promise<{ inserted: number; duplicates: number }>
   saveNote: (kind: 'day' | 'trade', key: string, text: string) => void
   candles: (args: { pair: string; date: string; exitDate?: string; entryTime: string; exitTime: string }) => Promise<Candle[]>

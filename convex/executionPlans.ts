@@ -3,19 +3,7 @@ import { mutation, query } from './_generated/server'
 import type { MutationCtx, QueryCtx } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import { belongsTo, requireOwner } from './identity'
-
-const planContent = v.object({
-  title: v.string(),
-  instrument: v.union(v.literal('EUR/USD'), v.literal('GBP/USD'), v.literal('AUD/USD'), v.literal('XAU/USD')),
-  timeframe: v.string(),
-  hypothesis: v.union(v.literal('bullish'), v.literal('bearish'), v.literal('neutral'), v.literal('conditional')),
-  thesis: v.string(), context: v.string(),
-  confirmations: v.array(v.object({ condition: v.string(), role: v.union(v.literal('required'), v.literal('supporting')), threshold: v.optional(v.string()), price: v.optional(v.number()), timeframe: v.optional(v.string()), status: v.union(v.literal('not_seen'), v.literal('satisfied'), v.literal('failed'), v.literal('not_applicable')), source: v.union(v.literal('user'), v.literal('verified')), sourceReference: v.optional(v.string()) })),
-  invalidationCondition: v.string(), invalidationLevel: v.optional(v.number()), invalidationAction: v.string(),
-  entryConditions: v.string(), orderApproach: v.union(v.literal('market'), v.literal('limit'), v.literal('stop'), v.literal('unspecified')),
-  managementPlan: v.string(), exitRationale: v.string(), abortConditions: v.string(),
-  maxLossUsd: v.optional(v.number()), maxLossPercent: v.optional(v.number()), protectiveStop: v.optional(v.number()), positionSizeNote: v.string(),
-})
+import { planContent } from './planValidators'
 type Content = Infer<typeof planContent>
 type PlanId = Id<'executionPlans'>
 
@@ -37,6 +25,7 @@ async function ownedPlan(ctx: ReadContext, planId: PlanId, owner: string) {
 function validateContent(content: Content): string[] {
   const errors: string[] = []
   if (!content.title.trim() || content.title.trim().length > 120) errors.push('Give this plan a title (up to 120 characters).')
+  if (!content.instrument.trim() || content.instrument.length > 32) errors.push('Enter an instrument symbol (up to 32 characters).')
   if (!content.timeframe.trim() || content.timeframe.length > 24) errors.push('Choose a timeframe.')
   if (!content.thesis.trim() || content.thesis.length > 2000) errors.push('Write a thesis (up to 2,000 characters).')
   if (content.context.length > 1000) errors.push('Keep context under 1,000 characters.')
@@ -58,6 +47,9 @@ function validateContent(content: Content): string[] {
   for (const [label, value] of [['Invalidation level', content.invalidationLevel], ['Protective stop', content.protectiveStop]] as const) {
     if (value !== undefined && (!Number.isFinite(value) || value <= 0)) errors.push(`${label} must be a positive price.`)
   }
+  for (const [label, range] of [['Entry area', content.entryRange], ['Target area', content.targetRange], ['Invalidation area', content.invalidationRange]] as const) {
+    if (range && (range.low === undefined || range.high === undefined || !Number.isFinite(range.low) || !Number.isFinite(range.high) || range.low <= 0 || range.high <= 0 || range.high < range.low)) errors.push(`${label} must have positive prices with the lower bound first.`)
+  }
   for (const item of content.confirmations) if (item.price !== undefined && (!Number.isFinite(item.price) || item.price <= 0)) errors.push('Confirmation prices must be positive.')
   return errors
 }
@@ -68,7 +60,7 @@ function requireValid(content: Content) {
 }
 
 function requireDraftBounds(content: Content) {
-  if (content.title.length > 120 || content.timeframe.length > 24 || content.thesis.length > 2000 || content.context.length > 1000 || content.confirmations.length > 20 || content.invalidationCondition.length > 1000 || content.invalidationAction.length > 500 || content.entryConditions.length > 1000 || content.managementPlan.length > 1000 || content.exitRationale.length > 1000 || content.abortConditions.length > 1000 || content.positionSizeNote.length > 500 || content.confirmations.some((item) => item.condition.length > 280 || (item.threshold?.length ?? 0) > 120 || (item.timeframe?.length ?? 0) > 24 || (item.sourceReference?.length ?? 0) > 500)) throw new Error('Some draft fields are too long.')
+  if (content.title.length > 120 || content.instrument.length > 32 || content.timeframe.length > 24 || content.thesis.length > 2000 || content.context.length > 1000 || content.confirmations.length > 20 || content.invalidationCondition.length > 1000 || content.invalidationAction.length > 500 || content.entryConditions.length > 1000 || content.managementPlan.length > 1000 || content.exitRationale.length > 1000 || content.abortConditions.length > 1000 || content.positionSizeNote.length > 500 || content.confirmations.some((item) => item.condition.length > 280 || (item.threshold?.length ?? 0) > 120 || (item.timeframe?.length ?? 0) > 24 || (item.sourceReference?.length ?? 0) > 500)) throw new Error('Some draft fields are too long.')
   if (content.confirmations.some((item) => item.source === 'verified')) throw new Error('Verified confirmations need a linked evidence source, which is not available in this milestone.')
 }
 
@@ -120,6 +112,18 @@ export const commit = mutation({ args: { planId: v.id('executionPlans'), expecte
   requireValid(content)
   const committedAt = Date.now()
   const versionId = await ctx.db.insert('executionPlanVersions', { owner, planId, accountId: plan.accountId, version: 1, content, committedAt, kind: 'original' })
+  const strategySelection = await ctx.db.query('planStrategySelections').withIndex('by_plan', (q) => q.eq('planId', planId)).unique()
+  if (strategySelection && belongsTo(strategySelection.owner, owner) && strategySelection.strategyVersionId) {
+    const strategyVersion = await ctx.db.get(strategySelection.strategyVersionId)
+    const strategy = strategyVersion && await ctx.db.get(strategyVersion.strategyId)
+    if (strategyVersion && strategy && belongsTo(strategyVersion.owner, owner) && belongsTo(strategy.owner, owner)) await ctx.db.insert('planVersionStrategies', { owner, planId, planVersionId: versionId, strategyVersionId: strategyVersion._id })
+  }
+  const images = await ctx.db.query('planImages').withIndex('by_plan', (q) => q.eq('planId', planId)).collect()
+  for (const image of images) if (image.planId === planId && belongsTo(image.owner, owner)) await ctx.db.insert('planVersionImages', { owner, planVersionId: versionId, imageId: image._id })
+  if (strategySelection?.analysisRunId && belongsTo(strategySelection.owner, owner)) {
+    const analysis = await ctx.db.get(strategySelection.analysisRunId)
+    if (analysis && analysis.planId === planId && belongsTo(analysis.owner, owner) && analysis.strategyVersionId === strategySelection.strategyVersionId) await ctx.db.insert('planVersionAnalyses', { owner, planId, planVersionId: versionId, analysisRunId: analysis._id })
+  }
   await ctx.db.patch(planId, { title: content.title.trim(), status: 'committed', draft: undefined, revision: plan.revision + 1, latestVersionId: versionId, updatedAt: committedAt })
   return { versionId, committedAt }
 } })
@@ -136,6 +140,12 @@ export const revise = mutation({ args: { planId: v.id('executionPlans'), expecte
   requireValid(content)
   const committedAt = Date.now()
   const versionId = await ctx.db.insert('executionPlanVersions', { owner, planId, accountId: plan.accountId, version: previous.version + 1, content, committedAt, kind: 'revision', reason: reason.trim(), previousVersionId: previous._id })
+  const previousStrategy = await ctx.db.query('planVersionStrategies').withIndex('by_plan_version', (q) => q.eq('planVersionId', previous._id)).unique()
+  if (previousStrategy && belongsTo(previousStrategy.owner, owner)) await ctx.db.insert('planVersionStrategies', { owner, planId, planVersionId: versionId, strategyVersionId: previousStrategy.strategyVersionId })
+  const previousImages = await ctx.db.query('planVersionImages').withIndex('by_plan_version', (q) => q.eq('planVersionId', previous._id)).collect()
+  for (const image of previousImages) if (belongsTo(image.owner, owner)) await ctx.db.insert('planVersionImages', { owner, planVersionId: versionId, imageId: image.imageId })
+  const previousAnalysis = await ctx.db.query('planVersionAnalyses').withIndex('by_plan_version', (q) => q.eq('planVersionId', previous._id)).unique()
+  if (previousAnalysis && belongsTo(previousAnalysis.owner, owner)) await ctx.db.insert('planVersionAnalyses', { owner, planId, planVersionId: versionId, analysisRunId: previousAnalysis.analysisRunId })
   await ctx.db.patch(planId, { title: content.title.trim(), latestVersionId: versionId, revision: plan.revision + 1, updatedAt: committedAt })
   return { versionId, committedAt }
 } })

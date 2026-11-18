@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ExecutionPlanContent, PlanConfirmation } from './domain/executionPlan'
+import type { ExecutionPlanContent, PlanConfirmation, PriceRange } from './domain/executionPlan'
 import { blankExecutionPlan, validateExecutionPlan } from './domain/executionPlan'
 import { useBackend } from './Backend'
 import { useConvexExecutionPlans } from './adapters/useConvexExecutionPlans'
 import type { ExecutionPlanDetail, ExecutionPlanStatus } from './adapters/useConvexExecutionPlans'
+import PlanImageWorkflow from './PlanImageWorkflow'
+import { PlanVersionEvidence } from './PlanImages'
 
 type Mode = 'guided' | 'quick'
 type EditMode = 'draft' | 'revision' | 'view'
@@ -27,8 +29,22 @@ function numberValue(value: string) {
   return Number.isFinite(result) ? result : undefined
 }
 
+function priceValue(value: string) {
+  if (!value.trim()) return undefined
+  const result = Number(value.replaceAll(',', '').trim())
+  return Number.isFinite(result) && result > 0 ? result : undefined
+}
+
 function PlanField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return <label className="plan-field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
+}
+
+function PriceRangeFields({ label, value, disabled, onChange }: { label: string; value?: PriceRange; disabled: boolean; onChange: (range: PriceRange | undefined) => void }) {
+  function update(edge: 'low' | 'high', raw: string) {
+    const next = { ...(value ?? {}), [edge]: raw === '' ? undefined : Number(raw) }
+    onChange(next.low === undefined && next.high === undefined ? undefined : next)
+  }
+  return <fieldset className="plan-price-range"><legend>{label} (optional)</legend><div className="plan-field-grid"><label className="plan-field"><span>Lower price</span><input type="number" min="0" step="any" value={value?.low ?? ''} disabled={disabled} onChange={(event) => update('low', event.target.value)}/></label><label className="plan-field"><span>Upper price</span><input type="number" min="0" step="any" value={value?.high ?? ''} disabled={disabled} onChange={(event) => update('high', event.target.value)}/></label></div><small>Enter both bounds. The area is a user-checked level, not a verified quote.</small></fieldset>
 }
 
 export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { initialPlanId?: string; onReviewNoTrade?: (planId: string) => void }) {
@@ -172,8 +188,8 @@ export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { ini
     if (index === 0) return <div className="plan-fields">
       <PlanField label="Plan title"><input value={value.title} maxLength={120} disabled={readOnly} onChange={(event) => onChange('title', event.target.value)}/></PlanField>
       <div className="plan-field-grid">
-        <PlanField label="Instrument"><select value={value.instrument} {...fieldProps} onChange={(event) => onChange('instrument', event.target.value as ExecutionPlanContent['instrument'])}><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>XAU/USD</option></select></PlanField>
-        <PlanField label="Timeframe"><select value={value.timeframe} {...fieldProps} onChange={(event) => onChange('timeframe', event.target.value)}>{['1m', '5m', '15m', '30m', '1h', '4h', '1D', 'Other'].map((frame) => <option key={frame}>{frame}</option>)}</select></PlanField>
+        <PlanField label="Instrument"><input list="plan-instrument-options" value={value.instrument} maxLength={32} disabled={readOnly} onChange={(event) => onChange('instrument', event.target.value)}/><datalist id="plan-instrument-options">{['EUR/USD', 'GBP/USD', 'AUD/USD', 'XAU/USD'].map((symbol) => <option key={symbol} value={symbol}/>)}</datalist></PlanField>
+        <PlanField label="Timeframe"><input list="plan-timeframe-options" value={value.timeframe} maxLength={24} disabled={readOnly} onChange={(event) => onChange('timeframe', event.target.value)}/><datalist id="plan-timeframe-options">{['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1D', '1W', '1M'].map((frame) => <option key={frame} value={frame}/>)}</datalist></PlanField>
         <PlanField label="Directional hypothesis"><select value={value.hypothesis} {...fieldProps} onChange={(event) => onChange('hypothesis', event.target.value as ExecutionPlanContent['hypothesis'])}><option value="bullish">Bullish</option><option value="bearish">Bearish</option><option value="neutral">Neutral</option><option value="conditional">Conditional</option></select></PlanField>
       </div>
       <PlanField label="Thesis"><textarea value={value.thesis} maxLength={2000} rows={4} disabled={readOnly} onChange={(event) => onChange('thesis', event.target.value)} placeholder="What is the market context behind this idea?"/></PlanField>
@@ -203,15 +219,18 @@ export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { ini
         <PlanField label="Invalidation level (optional)"><input type="number" min="0" step="any" value={value.invalidationLevel ?? ''} disabled={readOnly} onChange={(event) => onChange('invalidationLevel', numberValue(event.target.value))}/></PlanField>
         <PlanField label="What will you do if it occurs?"><input value={value.invalidationAction} maxLength={500} disabled={readOnly} onChange={(event) => onChange('invalidationAction', event.target.value)}/></PlanField>
       </div>
+      <PriceRangeFields label="Invalidation area" value={value.invalidationRange} disabled={readOnly} onChange={(range) => onChange('invalidationRange', range)}/>
     </div>
     if (index === 3) return <div className="plan-fields">
       <PlanField label="Planned entry conditions"><textarea value={value.entryConditions} maxLength={1000} rows={3} disabled={readOnly} onChange={(event) => onChange('entryConditions', event.target.value)}/></PlanField>
+      <PriceRangeFields label="Entry area" value={value.entryRange} disabled={readOnly} onChange={(range) => onChange('entryRange', range)}/>
+      <PlanField label="Target description and exit rationale"><textarea value={value.exitRationale} maxLength={1000} rows={2} disabled={readOnly} onChange={(event) => onChange('exitRationale', event.target.value)}/></PlanField>
+      <PriceRangeFields label="Target area" value={value.targetRange} disabled={readOnly} onChange={(range) => onChange('targetRange', range)}/>
       <div className="plan-field-grid">
         <PlanField label="Order approach"><select value={value.orderApproach} disabled={readOnly} onChange={(event) => onChange('orderApproach', event.target.value as ExecutionPlanContent['orderApproach'])}><option value="unspecified">Not specified</option><option value="market">Market</option><option value="limit">Limit</option><option value="stop">Stop</option></select></PlanField>
         <PlanField label="Abort or cancel conditions"><input value={value.abortConditions} maxLength={1000} disabled={readOnly} onChange={(event) => onChange('abortConditions', event.target.value)}/></PlanField>
       </div>
       <PlanField label="Management plan"><textarea value={value.managementPlan} maxLength={1000} rows={3} disabled={readOnly} onChange={(event) => onChange('managementPlan', event.target.value)}/></PlanField>
-      <PlanField label="Exit rationale"><textarea value={value.exitRationale} maxLength={1000} rows={3} disabled={readOnly} onChange={(event) => onChange('exitRationale', event.target.value)}/></PlanField>
     </div>
     return <div className="plan-fields">
       <div className="plan-field-grid">
@@ -263,7 +282,40 @@ export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { ini
           </div>
           {editMode !== 'view' && <div className="plan-mode-switch" role="group" aria-label="Plan editing mode"><button className={mode === 'guided' ? 'selected' : ''} type="button" aria-pressed={mode === 'guided'} onClick={() => setMode('guided')}>Guided</button><button className={mode === 'quick' ? 'selected' : ''} type="button" aria-pressed={mode === 'quick'} onClick={() => setMode('quick')}>Quick</button><span>{mode === 'guided' ? 'One section at a time' : 'All sections together'}</span></div>}
 
+          <div className={active.status === 'draft' ? 'plan-draft-workspace' : ''}>
+          <div className={active.status === 'draft' ? 'plan-draft-image-column' : ''}>
+          {active.status === 'draft' && <PlanImageWorkflow planId={active.id} revision={revision} onRevisionChange={setRevision} onApply={(draft) => {
+            setContent((current) => {
+              const availableSlots = Math.max(0, 20 - current.confirmations.length)
+              const suggestedSignals = draft.signals.slice(0, availableSlots).map((signal): PlanConfirmation => ({
+                condition: signal.signalName?.trim() ? `${signal.signalName.trim()}: ${signal.value}` : signal.value,
+                role: 'supporting', status: 'not_seen', source: 'user',
+                sourceReference: `${signal.location ? `Approx. chart location ${Math.round(signal.location.xPercent)}% from left and ${Math.round(signal.location.yPercent)}% from top. ` : ''}${signal.basis}: ${signal.evidence}`.slice(0, 500),
+              }))
+              const invalidationRange = draft.invalidation?.priceRange
+              return {
+                ...current,
+                instrument: draft.instrument?.value.trim() && draft.instrument.value.length <= 32 ? draft.instrument.value.trim() : current.instrument,
+                timeframe: draft.timeframe?.value.trim() && draft.timeframe.value.length <= 24 ? draft.timeframe.value.trim() : current.timeframe,
+                hypothesis: draft.bias?.value ?? current.hypothesis,
+                entryConditions: draft.entry?.value ?? current.entryConditions,
+                entryRange: draft.entry?.priceRange ?? current.entryRange,
+                invalidationCondition: draft.invalidation?.value ?? current.invalidationCondition,
+                invalidationRange: draft.invalidation?.priceRange ?? current.invalidationRange,
+                invalidationLevel: invalidationRange && invalidationRange.low === invalidationRange.high ? invalidationRange.low : current.invalidationLevel,
+                targetRange: draft.target?.priceRange ?? current.targetRange,
+                exitRationale: draft.target?.value ?? current.exitRationale,
+                protectiveStop: priceValue(draft.protectiveStop?.value ?? '') ?? current.protectiveStop,
+                confirmations: [...current.confirmations, ...suggestedSignals],
+              }
+            })
+            setDirty(true)
+            if (draft.signals.length > Math.max(0, 20 - content.confirmations.length)) setMessage('Suggestions applied. Remove unused conditions to make room for the remaining strategy signal matches.')
+            else setMessage('Suggestions copied into the editable plan. Check every value before committing.')
+          }}/>} {active.status !== 'draft' && displayedVersion && <PlanVersionEvidence versionId={displayedVersion.id}/>}
+          </div><div className={active.status === 'draft' ? 'plan-draft-fields-column' : ''}>
           {displayedContent && renderContent(displayedContent, readOnly)}
+          </div></div>
 
           {editMode === 'view' && active.status === 'committed' && displayedVersion && <div className="plan-version-meta"><strong>Version {displayedVersion.version} · {displayedVersion.kind === 'original' ? 'Original snapshot' : 'Revision'}</strong><time dateTime={new Date(displayedVersion.committedAt).toISOString()}>Committed {timestamp(displayedVersion.committedAt)}</time>{displayedVersion.reason && <p>Revision reason: {displayedVersion.reason}</p>}<p>This plan is not linked to an execution. Its commit time alone does not establish that it was written before a trade.</p></div>}
           {editMode === 'view' && active.status === 'draft' && <div className="plan-version-meta"><strong>Draft · Not committed</strong><p>No frozen version or server commit timestamp exists yet.</p></div>}

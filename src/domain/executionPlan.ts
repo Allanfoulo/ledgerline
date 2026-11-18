@@ -1,8 +1,9 @@
-export type PlanInstrument = 'EUR/USD' | 'GBP/USD' | 'AUD/USD' | 'XAU/USD'
+export type PlanInstrument = string
 export type PlanHypothesis = 'bullish' | 'bearish' | 'neutral' | 'conditional'
 export type ConfirmationRole = 'required' | 'supporting'
 export type ConfirmationStatus = 'not_seen' | 'satisfied' | 'failed' | 'not_applicable'
 export type OrderApproach = 'market' | 'limit' | 'stop' | 'unspecified'
+export type PriceRange = { low?: number; high?: number }
 
 export type PlanConfirmation = {
   condition: string
@@ -23,6 +24,9 @@ export type ExecutionPlanContent = {
   thesis: string
   context: string
   confirmations: PlanConfirmation[]
+  entryRange?: PriceRange
+  targetRange?: PriceRange
+  invalidationRange?: PriceRange
   invalidationCondition: string
   invalidationLevel?: number
   invalidationAction: string
@@ -48,6 +52,7 @@ export function blankExecutionPlan(): ExecutionPlanContent {
 export function validateExecutionPlan(content: ExecutionPlanContent): string[] {
   const errors: string[] = []
   if (!content.title.trim() || content.title.trim().length > 120) errors.push('Give this plan a title (up to 120 characters).')
+  if (!content.instrument.trim() || content.instrument.length > 32) errors.push('Enter an instrument symbol (up to 32 characters).')
   if (!content.timeframe.trim() || content.timeframe.length > 24) errors.push('Choose a timeframe.')
   if (!content.thesis.trim() || content.thesis.length > 2000) errors.push('Write a thesis (up to 2,000 characters).')
   if (content.context.length > 1000) errors.push('Keep context under 1,000 characters.')
@@ -68,6 +73,9 @@ export function validateExecutionPlan(content: ExecutionPlanContent): string[] {
   if (percent !== undefined && (!Number.isFinite(percent) || percent <= 0 || percent > 100)) errors.push('Maximum loss percentage must be above 0 and at most 100%.')
   for (const [label, value] of [['Invalidation level', content.invalidationLevel], ['Protective stop', content.protectiveStop]] as const) {
     if (value !== undefined && (!Number.isFinite(value) || value <= 0)) errors.push(`${label} must be a positive price.`)
+  }
+  for (const [label, range] of [['Entry area', content.entryRange], ['Target area', content.targetRange], ['Invalidation area', content.invalidationRange]] as const) {
+    if (range && (range.low === undefined || range.high === undefined || !Number.isFinite(range.low) || !Number.isFinite(range.high) || range.low <= 0 || range.high <= 0 || range.high < range.low)) errors.push(`${label} must have positive prices with the lower bound first.`)
   }
   return errors
 }
