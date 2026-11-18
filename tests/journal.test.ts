@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 import { forexPnl, tradeFingerprint, validateTrade } from '../src/domain/trade'
 import type { TradeInput } from '../src/domain/trade'
 import { parseCsv, previewCsv, suggestMapping } from '../src/application/tradeImport'
@@ -140,4 +142,21 @@ test('backtest closes multiple independent long and short positions with commiss
   assert.throws(() => closeAllPositions(positions, '2026-11-02', 'EUR/USD', 1.102, '08:01', 2))
   assert.equal(positions.length, 2)
   assert.throws(() => closeAllPositions(positions, '2026-11-02', 'EUR/USD', 1.102, '08:02', -1))
+})
+
+
+test('theme bootstrap preserves older preferences and favors the new setting', () => {
+  const html = readFileSync('index.html', 'utf8')
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]
+  assert.ok(script)
+  function theme(values: Record<string, string>, fail = false) {
+    const document = { documentElement: { dataset: {} as Record<string, string> } }
+    const localStorage = { getItem: (key: string) => { if (fail) throw new Error('storage denied'); return values[key] ?? null } }
+    runInNewContext(script!, { document, localStorage })
+    return document.documentElement.dataset.theme
+  }
+  assert.equal(theme({ 'ledgerline-theme': 'light' }), 'light')
+  assert.equal(theme({ 'ledgerline-theme': 'light', 'sideprint-theme': 'dark' }), 'dark')
+  assert.equal(theme({ 'sideprint-theme': 'light' }), 'light')
+  assert.doesNotThrow(() => theme({}, true))
 })

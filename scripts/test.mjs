@@ -1,9 +1,15 @@
 import { build } from 'esbuild'
 import { spawnSync } from 'node:child_process'
-import { mkdir } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
-await mkdir('.tmp/tests', { recursive: true })
-const tests = ['journal.test', 'convexJournal.test', 'connector.test']
-await build({ entryPoints: tests.map((name) => `tests/${name}.ts`), outdir: '.tmp/tests', bundle: true, platform: 'node', format: 'cjs', outExtension: { '.js': '.cjs' }, logLevel: 'warning' })
-const result = spawnSync(process.execPath, ['--test', ...tests.map((name) => `.tmp/tests/${name}.cjs`)], { stdio: 'inherit' })
-process.exit(result.status ?? 1)
+const tests = ['journal.test', 'convexJournal.test', 'connector.test', 'prints.test', 'printChart.test', 'executionPlans.test', 'convexImagePlans.test', 'printReview.test', 'convexPrintReviews.test', 'chartAnalysis.test']
+const outputDir = await mkdtemp(join(tmpdir(), 'personal-fx-journal-tests-'))
+try {
+  await build({ entryPoints: tests.map((name) => `tests/${name}.ts`), outdir: outputDir, bundle: true, platform: 'node', format: 'cjs', outExtension: { '.js': '.cjs' }, logLevel: 'warning' })
+  const result = spawnSync(process.execPath, ['--test', ...tests.map((name) => join(outputDir, `${name}.cjs`))], { stdio: 'inherit' })
+  process.exitCode = result.status ?? 1
+} finally {
+  await rm(outputDir, { recursive: true, force: true })
+}

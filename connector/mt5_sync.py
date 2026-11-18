@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import MetaTrader5 as mt5
+import mt5_chart
 from mt5_normalize import UnsupportedTrade, normalize_position
 
 
@@ -42,6 +43,49 @@ def upload(url, token, broker_key, trades):
             raise RuntimeError('Sync failed. Check the token, account mapping, and connection.') from error
         total['inserted'] += result['inserted']; total['duplicates'] += result['duplicates']
     return total
+
+
+def post_json(url, path, token, payload, limit=800000):
+    class NoRedirect(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    body = json.dumps(payload, separators=(',', ':')).encode()
+    if len(body) > limit:
+        raise RuntimeError('Chart data exceeds the connector upload limit.')
+    request = Request(f'{url}{path}', data=body, headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}, method='POST')
+    try:
+        with build_opener(NoRedirect).open(request, timeout=45) as response:
+            return json.load(response)
+    except (HTTPError, URLError, TimeoutError, OSError) as error:
+        raise RuntimeError('Chart synchronization failed. Check the connector token and connection.') from error
+
+
+def sync_print_charts(mt5, url, token, broker_key, limit=5):
+    """Acquire a small bounded batch of candles for queued MT5 Trade Prints."""
+    completed = 0
+    unavailable = 0
+    for _ in range(limit):
+        job = post_json(url, '/mt5/prints/claim', token, {'brokerKey': broker_key}, 2048)
+        if job is None:
+            break
+        trade = job['trade']
+        entry = datetime.strptime(f"{trade['date']} {trade['entryTime']}", '%Y-%m-%d %H:%M').replace(tzinfo=timezone.utc)
+        exit_date = trade.get('exitDate') or trade['date']
+        exit_time = datetime.strptime(f"{exit_date} {trade['exitTime']}", '%Y-%m-%d %H:%M').replace(tzinfo=timezone.utc)
+        candles = mt5_chart.acquire_candles(mt5, job['symbol'], entry, exit_time)
+        result = post_json(url, '/mt5/prints/candles', token, {
+            'brokerKey': broker_key,
+            'jobId': job['jobId'],
+            'leaseToken': job['leaseToken'],
+            'sourceKey': job['sourceKey'],
+            'symbol': job['symbol'],
+            'quality': candles['quality'],
+            'candles': candles['candles'],
+        })
+        completed += result['status'] == 'ready_to_render'
+        unavailable += result['status'] == 'needs_data'
+    return {'ready': completed, 'unavailable': unavailable}
 
 
 def main():
@@ -89,6 +133,9 @@ def main():
                 result = upload(url, token, broker_key, normalized)
                 print(f"Sync complete: {result['inserted']} imported, {result['duplicates']} already present.")
             else: print('No supported closed positions found.')
+            chart_result = sync_print_charts(mt5, url, token, broker_key)
+            if chart_result['ready'] or chart_result['unavailable']:
+                print(f"Trade Print candles: {chart_result['ready']} ready for automatic image capture, {chart_result['unavailable']} unavailable from MT5 history.")
             for reason, count in sorted(skipped.items()): print(f'Skipped {count}: {reason}.')
             if args.once: return 0
             initial = False; time.sleep(args.interval)

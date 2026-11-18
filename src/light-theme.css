@@ -1,4 +1,4 @@
-/* Ledgerline daylight: warm paper surfaces, ink text, and restrained forest accents. */
+/* SidePrint daylight: warm paper surfaces, ink text, and restrained forest accents. */
 :root[data-theme='light'] {
   color-scheme: light;
   color: #24352b;
@@ -99,3 +99,27 @@
   .auth-theme { top: 14px; right: 20px; }
   :root[data-theme='light'] .sidebar { background: rgba(232, 239, 230, .98); }
 }
+
+:root[data-theme="light"] .brand-copy small { color: #52675a; }
+
+:root[data-theme='light'] .plan-account-picker { color: #52675a; }
+:root[data-theme='light'] .plan-account-picker select,
+:root[data-theme='light'] .plan-field input,
+:root[data-theme='light'] .plan-field textarea,
+:root[data-theme='light'] .plan-field select { color: #304b38; background: #f9fbf7; border-color: #ccdacc; }
+:root[data-theme='light'] .plan-field input:disabled,
+:root[data-theme='light'] .plan-field textarea:disabled,
+:root[data-theme='light'] .plan-field select:disabled { color: #304b38; background: #eef3eb; }
+:root[data-theme='light'] .plan-field input::placeholder,
+:root[data-theme='light'] .plan-field textarea::placeholder { color: #687d6d; }
+:root[data-theme='light'] .plan-list-item { color: #304437; }
+:root[data-theme='light'] .plan-list-item:hover,
+:root[data-theme='light'] .plan-list-item.selected { background: #eaf1e9; }
+:root[data-theme='light'] .plan-status-committed { color: #256b43; }
+:root[data-theme='light'] .plan-status-cancelled,
+:root[data-theme='light'] .plan-status-expired { color: #72531c; }
+:root[data-theme='light'] .plan-message { color: #256b43; }
+:root[data-theme='light'] .plan-errors { color: #a23f38; }
+:root[data-theme='light'] .plan-step-nav button.selected span { color: #256b43; }
+
+:root[data-theme="light"] :is(.account-copy span, .nav-count, .sidebar-section-label, .sidebar-footnote, .nav-item, .tab-count) { color: #52675a; }

@@ -10,8 +10,15 @@ import { StrategyPage, TradeStrategy } from './StrategyPage'
 import Reports from './Reports'
 const Backtest = lazy(() => import('./Backtest'))
 import ThemeToggle from './ThemeToggle'
+import BrandLockup from './BrandLockup'
+import PrintBackfill from './PrintBackfill'
+import { executionPlansEnabled, printReviewsEnabled, tradePrintsEnabled } from './config/features'
+import TradePrintCaptureWorker from './TradePrintCaptureWorker'
+import TradePrintArtifact from './TradePrintArtifact'
+import ExecutionPlans from './ExecutionPlans'
+import PrintReviewHub from './PrintReviewHub'
 
-type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest'
+type Page = 'dashboard' | 'trades' | 'notes' | 'detail' | 'settings' | 'manage' | 'strategies' | 'reports' | 'backtest' | 'execution-plans' | 'review-queue'
 type TradesTab = 'Day' | 'Week' | 'All'
 const latestSampleDate = tradeFixtures.map((trade) => trade.date).sort().at(-1) ?? ''
 
@@ -21,6 +28,8 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     grid: <><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></>,
     chart: <><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/><path d="M16 7h3v3"/></>,
     book: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5v15A2.5 2.5 0 0 1 7.5 17H20"/><path d="M9 7h7"/></>,
+    plan: <><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4"/></>,
+    review: <><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22z"/><path d="M5 4.5v15A2.5 2.5 0 0 1 7.5 17H20"/><path d="m9 10 2 2 4-4"/></>,
     search: <><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></>,
     chevron: <path d="m9 18 6-6-6-6"/>,
     down: <path d="m7 10 5 5 5-5"/>,
@@ -73,6 +82,8 @@ function App() {
   })), [backend.samplePrices])
   const allTrades = useMemo(() => dataset === 'sample' ? sampleTrades : enrichedTrades(backend.realTrades.map((trade) => { const review = backend.reviews.find((item) => item.tradeId === trade.id); const strategy = backend.strategies.find((item) => item.id === review?.strategyId); return strategy ? { ...trade, setup: strategy.name } : trade })), [dataset, sampleTrades, backend.realTrades, backend.reviews, backend.strategies])
   const [page, setPage] = useState<Page>('dashboard')
+  const [initialPlanId, setInitialPlanId] = useState<string | undefined>()
+  const [initialReviewPlanId, setInitialReviewPlanId] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<TradesTab>('All')
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(latestSampleDate)
@@ -117,15 +128,16 @@ function App() {
 
   return (
     <div className="app-shell">
+      <TradePrintCaptureWorker enabled={tradePrintsEnabled && backend.authenticated}/>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
-        <div className="brand-lockup">
-          <div className="brand-symbol"><span/><span/><span/></div>
-          <div className="brand-copy"><strong>Ledgerline</strong><small>PERSONAL FX JOURNAL</small></div>
-        </div>
+        <BrandLockup/>
         <div className="sidebar-section-label">WORKSPACE</div>
         <nav className="primary-nav" aria-label="Main navigation">
           <button className={`nav-item ${page === 'dashboard' ? 'active' : ''}`} onClick={() => setPage('dashboard')}><Icon name="grid"/><span>Dashboard</span></button>
           <button className={`nav-item ${page === 'trades' || page === 'detail' ? 'active' : ''}`} onClick={() => { setPage('trades'); setActiveTab('All') }}><Icon name="chart"/><span>Trades</span><span className="nav-count">{allTrades.length}</span></button>
+          {printReviewsEnabled && <button className={`nav-item ${page === 'review-queue' ? 'active' : ''}`} aria-label="Review Queue" onClick={() => { setDataset('real'); setInitialReviewPlanId(undefined); setPage('review-queue') }}><Icon name="review"/><span>Review</span></button>}
+          {executionPlansEnabled && <button className={`nav-item ${page === 'execution-plans' ? 'active' : ''}`} onClick={() => setPage('execution-plans')}><Icon name="plan"/><span>Plans</span></button>}
           <button className={`nav-item ${page === 'notes' ? 'active' : ''}`} onClick={() => setPage('notes')}><Icon name="book"/><span>Notebook</span></button>
           <button className={`nav-item ${page === 'manage' ? 'active' : ''}`} onClick={() => setPage('manage')}><Icon name="plus"/><span>Add trades</span></button>
           <button className={`nav-item ${page === 'strategies' ? 'active' : ''}`} onClick={() => setPage('strategies')}><Icon name="book"/><span>Strategies</span></button>
@@ -143,7 +155,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main-area">
+      <main className="main-area" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <div className="breadcrumb"><span>Journal</span><Icon name="chevron" size={14}/><strong>{page === 'detail' ? 'Trade detail' : pageTitle(page)}</strong></div>
           <div className="topbar-actions"><label className="dataset-picker"><span className="sr-only">Journal data</span><select value={dataset} onChange={(event) => { setDataset(event.target.value as 'sample' | 'real'); if (page === 'detail') setPage('trades') }}><option value="sample">Sample trades</option><option value="real" disabled={!backend.authenticated}>My trades</option></select></label>{dataset === 'real' && <label className="dataset-picker"><span className="sr-only">Trading account</span><select value={backend.accountId} onChange={(event) => { backend.setAccountId(event.target.value); if (page === 'detail') setPage('trades') }}><option value="">Choose account</option>{backend.accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}<ThemeToggle/><button className="icon-button mobile-menu" aria-label="Open menu"><Icon name="grid"/></button><ProfileMenu signOut={backend.signOut} openSettings={() => setPage('settings')}/></div>
@@ -151,11 +163,14 @@ function App() {
         {backend.error && page !== 'settings' && <div className="page-content replay-error" role="alert">{backend.error}</div>}
 
         {page === 'dashboard' && <Dashboard sample={dataset === 'sample'} trades={allTrades} month={calendarMonth} setMonth={setCalendarMonth} onSelectDay={selectDay} onOpenTrade={goToTrade} onOpenAll={() => { setPage('trades'); setActiveTab('All') }} />}
+        {page === 'trades' && tradePrintsEnabled && dataset === 'real' && backend.accountId && <div className="page-content print-setup-wrap"><PrintBackfill key={backend.accountId} accountId={backend.accountId}/></div>}
         {page === 'trades' && <TradesPage trades={allTrades} visibleTrades={visibleTrades} groups={groups} selectedDate={selectedDate} setSelectedDate={setSelectedDate} activeTab={activeTab} setActiveTab={setActiveTab} search={search} setSearch={setSearch} pairFilter={pairFilter} setPairFilter={setPairFilter} sortNewest={sortNewest} setSortNewest={setSortNewest} dayNote={dayNoteFor(selectedDate)} setDayNote={(value) => { const key = dayKey(selectedDate); setDayNoteEdits((notes) => ({ ...notes, [key]: value })); if (dataset === 'sample' || backend.accountId) backend.saveNote('day', key, value) }} onOpenTrade={goToTrade} onSelectDay={selectDay} />}
         {page === 'detail' && selectedTrade && <TradeDetail trade={selectedTrade} dayNote={dayNoteFor(selectedTrade.exitDate ?? selectedTrade.date)} tradeNote={tradeNoteEdits[selectedTrade.id] ?? backend.tradeNotes[selectedTrade.id] ?? selectedTrade.note} setTradeNote={(value) => { setTradeNoteEdits((notes) => ({ ...notes, [selectedTrade.id]: value })); setNoteSaved(false) }} noteSaved={noteSaved} onSaveNote={() => { backend.saveNote('trade', selectedTrade.id, tradeNoteEdits[selectedTrade.id] ?? backend.tradeNotes[selectedTrade.id] ?? selectedTrade.note); setNoteSaved(backend.authenticated) }} onBack={() => { setPage('trades'); setActiveTab('All') }} />}
         {page === 'notes' && <Notebook trades={allTrades} dayNoteEdits={currentDayNotes} onSelectDay={selectDay} />}
         {page === 'manage' && <JournalEditor onViewTrades={() => { setDataset('real'); setPage('trades'); setActiveTab('All') }} />}
         {page === 'strategies' && <StrategyPage />}
+        {executionPlansEnabled && page === 'execution-plans' && <ExecutionPlans initialPlanId={initialPlanId} onReviewNoTrade={(planId) => { setInitialReviewPlanId(planId); setPage('review-queue') }} />}
+        {printReviewsEnabled && page === 'review-queue' && <PrintReviewHub authenticated={backend.authenticated} accountId={backend.accountId || undefined} initialPlanId={initialReviewPlanId} onOpenPlans={(planId, accountId) => { setDataset('real'); if (accountId) backend.setAccountId(accountId); setInitialPlanId(planId); setPage('execution-plans') }} />}
         {page === 'reports' && <Reports trades={allTrades} />}
         {page === 'backtest' && <Suspense fallback={<div className="page-content" role="status">Loading backtesting…</div>}><Backtest /></Suspense>}
         {page === 'settings' && <div className="page-content"><PageHeading title="Settings" description="Manage your account and market data connection."/><section className="panel settings-panel">{backend.settings}{backend.error && <p className="replay-error" role="alert">{backend.error}</p>}</section></div>}
@@ -164,7 +179,7 @@ function App() {
   )
 }
 
-function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : 'Trade detail' }
+function pageTitle(page: Page) { return page === 'dashboard' ? 'Dashboard' : page === 'trades' ? 'Trades' : page === 'notes' ? 'Notebook' : page === 'settings' ? 'Settings' : page === 'manage' ? 'Accounts & trades' : page === 'strategies' ? 'Strategies' : page === 'reports' ? 'Reports' : page === 'backtest' ? 'Backtest' : page === 'execution-plans' ? 'Execution Plans' : page === 'review-queue' ? 'Review Queue' : 'Trade detail' }
 
 function PageHeading({ title, description, actions }: { title: string; description: string; actions?: React.ReactNode }) {
   return <div className="page-heading"><div><h1>{title}</h1><p>{description}</p></div>{actions && <div className="heading-actions">{actions}</div>}</div>
@@ -184,7 +199,7 @@ function Dashboard({ sample, trades, month, setMonth, onSelectDay, onOpenTrade, 
   const firstDate = curve[0]?.date ?? ''
   const lastDate = curve.at(-1)?.date ?? ''
   return <div className="page-content">
-    <PageHeading title="Your trading, in focus." description="A clear read on the decisions behind your results." actions={<><label className="dataset-picker"><span className="sr-only">Dashboard period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="all">All time</option><option value="30">Last 30 days</option></select></label><label className="dataset-picker"><span className="sr-only">Dashboard pair</span><select value={pair} onChange={(event) => setPair(event.target.value)}><option value="all">All pairs</option><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>XAU/USD</option></select></label></>}/>
+    <PageHeading title="Performance overview" description="Review the record behind your results." actions={<><label className="dataset-picker"><span className="sr-only">Dashboard period</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="all">All time</option><option value="30">Last 30 days</option></select></label><label className="dataset-picker"><span className="sr-only">Dashboard pair</span><select value={pair} onChange={(event) => setPair(event.target.value)}><option value="all">All pairs</option><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>XAU/USD</option></select></label></>}/>
     <section className="metrics-row" aria-label="Performance summary">
       <Metric label="Net P&L" value={formatSignedMoney(summary.netPnl)} detail={`${summary.trades} closed trades · after fees`} tone={currencyClass(summary.netPnl)} icon="chart"/>
       <Metric label="Win rate" value={`${summary.winRate.toFixed(1)}%`} detail={`${summary.winners} wins of ${summary.trades} trades`} icon="grid"/>
@@ -199,7 +214,7 @@ function Dashboard({ sample, trades, month, setMonth, onSelectDay, onOpenTrade, 
       <div className="panel-heading"><div><h2>Recent trades</h2><p>Your latest decisions, with the result attached.</p></div><button className="text-button" onClick={onOpenAll}>View all trades <Icon name="arrow" size={15}/></button></div>
       <TradeTable trades={[...shownTrades].sort((a, b) => b.date.localeCompare(a.date) || b.entryTime.localeCompare(a.entryTime)).slice(0, 5)} onOpenTrade={onOpenTrade}/>
     </section>
-    <div className="demo-note"><span className="status-dot"/>{sample ? 'Illustrative sample trades.' : 'Your selected account.'} Results are calculated from the displayed Forex fills and fees.</div>
+    <div className="demo-note"><span className="status-dot"/>{sample ? 'Illustrative sample trades.' : 'Your selected account.'} Results are calculated from the displayed fills, commissions and swap.</div>
   </div>
 }
 
@@ -252,7 +267,7 @@ function TradeTable({ trades, onOpenTrade, compact = false }: { trades: TradeWit
     <thead><tr><th>Date</th><th>Pair / setup</th><th>Side</th><th>Lots</th><th>Entry → exit</th><th>Move</th><th>Net P&L</th><th><span className="sr-only">Open trade</span></th></tr></thead>
     <tbody>{trades.length ? trades.map((trade) => <tr key={trade.id} onClick={() => onOpenTrade(trade)} tabIndex={0} onKeyDown={(event) => event.key === 'Enter' && onOpenTrade(trade)}>
       <td><span className="table-date">{shortDate(trade.date)}</span><small>{trade.entryTime}</small></td>
-      <td><span className="pair-name">{trade.pair}</span><small>{trade.setup}</small></td>
+      <td><span className="pair-name">{trade.pair}</span><small>{trade.setup}</small>{trade.printStatus && <small className="print-status">Trade Print · {trade.printStatus.replaceAll('_', ' ')}</small>}</td>
       <td><span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span></td>
       <td className="numeric">{trade.lots.toFixed(2)}</td>
       <td className="numeric price-range">{formatPrice(trade.entry)} <span>→</span> {formatPrice(trade.exit)}</td>
@@ -285,7 +300,7 @@ function TradesPage({ trades, visibleTrades, groups, selectedDate, setSelectedDa
     { label: 'Profit factor', value: Number.isFinite(weekSummary.profitFactor) ? weekSummary.profitFactor.toFixed(2) : '∞', tone: '' },
   ]
   return <div className="page-content">
-    <PageHeading title="Trade review" description="Find the pattern in the trades you have taken." actions={<button className="button button-quiet"><Icon name="download" size={16}/> Export view</button>}/>
+    <PageHeading title="Trade review" description="Find the pattern in the trades you have taken."/>
     <div className="tabs" role="tablist" aria-label="Trade review view">{(['Day', 'Week', 'All'] as TradesTab[]).map((tab) => <button key={tab} className={activeTab === tab ? 'selected' : ''} role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)}>{tab}{tab === 'All' && <span className="tab-count">{trades.length}</span>}</button>)}</div>
     {activeTab === 'Day' && <>
       <section className="day-toolbar"><div><span className="section-label">SESSION</span><label className="date-select"><Icon name="calendar" size={16}/><select value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)}>{!days.includes(selectedDate) && <option value={selectedDate}>{days.length ? `${weekday(selectedDate, true)}, ${shortDate(selectedDate)} · No trades` : 'No trading sessions yet'}</option>}{days.map((date) => <option value={date} key={date}>{weekday(date, true)}, {shortDate(date)}</option>)}</select><Icon name="down" size={14}/></label></div><div className="day-nudge"><button className="text-button" disabled={!days.length || days.indexOf(selectedDate) === 0} onClick={() => setSelectedDate(days[Math.max(0, days.indexOf(selectedDate) - 1)])}><Icon name="left" size={16}/> Previous</button><button className="text-button" disabled={!days.length || days.indexOf(selectedDate) === days.length - 1} onClick={() => setSelectedDate(days[Math.min(days.length - 1, days.indexOf(selectedDate) + 1)])}>Next <Icon name="right" size={16}/></button></div></section>
@@ -298,7 +313,7 @@ function TradesPage({ trades, visibleTrades, groups, selectedDate, setSelectedDa
       <div className="week-stats">{weekStats.map((stat) => <div key={stat.label}><span>{stat.label}</span><strong className={stat.tone}>{stat.value}</strong></div>)}</div>
       <div className="week-table"><div className="panel-heading"><div><h2>Trades this week</h2><p>{weekTrades.length} closed trades, sorted by date.</p></div></div><TradeTable trades={weekTrades} onOpenTrade={onOpenTrade}/></div>
     </section>}
-    {activeTab === 'All' && <section className="panel all-trades-panel"><div className="panel-heading"><div><h2>All trades</h2><p>{visibleTrades.length} of {trades.length} trades · click a row to open details</p></div></div><div className="table-controls"><label className="search-field"><Icon name="search" size={16}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search pair, setup, or tag"/></label><label className="select-control"><select value={pairFilter} onChange={(event) => setPairFilter(event.target.value)}><option>All pairs</option><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>XAU/USD</option></select><Icon name="down" size={14}/></label><button className="text-button" onClick={() => setSortNewest(!sortNewest)}>{sortNewest ? 'Newest first' : 'Oldest first'} <Icon name="down" size={14}/></button></div><TradeTable trades={visibleTrades} onOpenTrade={onOpenTrade}/><div className="table-footer">Showing {visibleTrades.length} trades</div></section>}
+    {activeTab === 'All' && <section className="panel all-trades-panel"><div className="panel-heading"><div><h2>All trades</h2><p>{visibleTrades.length} of {trades.length} trades · click a row to open details</p></div></div><div className="table-controls"><label className="search-field"><span className="sr-only">Search trades</span><Icon name="search" size={16}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search pair, setup, or tag"/></label><label className="select-control"><span className="sr-only">Filter by pair</span><select value={pairFilter} onChange={(event) => setPairFilter(event.target.value)}><option>All pairs</option><option>EUR/USD</option><option>GBP/USD</option><option>AUD/USD</option><option>XAU/USD</option></select><Icon name="down" size={14}/></label><button className="text-button" onClick={() => setSortNewest(!sortNewest)}>{sortNewest ? 'Newest first' : 'Oldest first'} <Icon name="down" size={14}/></button></div><TradeTable trades={visibleTrades} onOpenTrade={onOpenTrade}/><div className="table-footer">Showing {visibleTrades.length} trades</div></section>}
   </div>
 }
 
@@ -310,22 +325,23 @@ function TradeDetail({ trade, dayNote, tradeNote, setTradeNote, noteSaved, onSav
   const backend = useBackend()
   return <div className="page-content detail-content">
     <button className="back-button" onClick={onBack}><Icon name="left" size={16}/> Back to trades</button>
-    <PageHeading title={`${trade.pair} · ${trade.side}`} description={`${shortDate(trade.date)} ${trade.entryTime} – ${shortDate(trade.exitDate ?? trade.date)} ${trade.exitTime} UTC`} actions={<button className="button button-quiet"><Icon name="more" size={17}/> More</button>}/>
-    <section className="detail-hero panel"><div className="detail-instrument"><span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span><span>{trade.lots.toFixed(2)} lots</span><span className="detail-sep"/><span>{trade.setup}</span></div><div className="detail-pnl"><span>NET RESULT</span><strong className={currencyClass(trade.netPnl)}>{formatSignedMoney(trade.netPnl)}</strong></div><div className="detail-breakdown"><div><span>{trade.pair === 'XAU/USD' ? 'Ticks (0.001)' : 'Pips'}</span><strong className={currencyClass(trade.pips)}>{trade.pips > 0 ? '+' : ''}{trade.pips.toFixed(1)}</strong></div><div><span>Gross P&L</span><strong>{formatSignedMoney(trade.grossPnl)}</strong></div><div><span>Commission</span><strong className="negative">−{formatMoney(trade.commission)}</strong></div><div><span>Swap</span><strong>{trade.swap ? formatSignedMoney(-trade.swap) : formatMoney(0)}</strong></div></div></section>
-    <Replay key={trade.id} trade={trade}/>
+    <PageHeading title={`${trade.pair} · ${trade.side}`} description={`${shortDate(trade.date)} ${trade.entryTime} – ${shortDate(trade.exitDate ?? trade.date)} ${trade.exitTime} UTC`}/>
+    <section className="detail-hero panel"><div className="detail-instrument"><span className="record-label">ON RECORD</span>{trade.printStatus && <span className="print-status">Trade Print · {trade.printStatus.replaceAll('_', ' ')}</span>}<span className={`side-tag ${trade.side.toLowerCase()}`}>{trade.side}</span><span>{trade.lots.toFixed(2)} lots</span><span className="detail-sep"/><span>{trade.setup}</span></div><div className="detail-pnl"><span>NET RESULT</span><strong className={currencyClass(trade.netPnl)}>{formatSignedMoney(trade.netPnl)}</strong></div><div className="detail-breakdown"><div><span>{trade.pair === 'XAU/USD' ? 'Ticks (0.001)' : 'Pips'}</span><strong className={currencyClass(trade.pips)}>{trade.pips > 0 ? '+' : ''}{trade.pips.toFixed(1)}</strong></div><div><span>Gross P&L</span><strong>{formatSignedMoney(trade.grossPnl)}</strong></div><div><span>Commission</span><strong className="negative">−{formatMoney(trade.commission)}</strong></div><div><span>Swap</span><strong>{trade.swap ? formatSignedMoney(-trade.swap) : formatMoney(0)}</strong></div></div></section>
     <div className="detail-columns"><div className="detail-main-column">
       {trade.source === 'real' && <TradeStrategy tradeId={trade.id}/>}
       <section className="panel execution-panel"><div className="panel-heading"><div><h2>Execution</h2><p>Entry and exit fills for this trade.</p></div><span className="execution-count">{trade.executions.length} fills</span></div><div className="execution-table"><div className="execution-row execution-head"><span>Time</span><span>Action</span><span>Price</span><span>Size</span></div>{trade.executions.map((execution, index) => <div className="execution-row" key={`${trade.id}-${index}`}><span>{trade.exitDate && trade.exitDate !== trade.date ? `${shortDate(execution.date ?? trade.date)} ` : ""}{execution.time}</span><span><i className={`execution-dot ${execution.action.toLowerCase()}`}/>{execution.action}</span><strong>{formatPrice(execution.price)}</strong><span>{execution.lots.toFixed(2)} lots</span></div>)}</div><div className="entry-exit-line"><div><span>Entry</span><strong>{formatPrice(trade.entry)}</strong><small>{shortDate(trade.date)} {trade.entryTime}</small></div><div className="price-track"><span/><i/></div><div><span>Exit</span><strong>{formatPrice(trade.exit)}</strong><small>{shortDate(trade.exitDate ?? trade.date)} {trade.exitTime}</small></div></div></section>
       <section className="panel detail-note"><div className="panel-heading"><div><h2>Trade note</h2><p>Keep the context attached to the decision.</p></div><span className="note-state">{!backend.authenticated ? 'SIGN IN TO SAVE' : noteSaved ? 'SAVE REQUESTED' : 'EDITING'}</span></div><textarea aria-label="Trade note" value={tradeNote} onChange={(event) => setTradeNote(event.target.value)} placeholder="Add your observation about this trade…"/><div className="note-actions"><div className="tag-list">{trade.tags.map((tag) => <span className="trade-tag" key={tag}>{tag}</span>)}</div><button className="button button-primary" onClick={onSaveNote} disabled={!backend.authenticated}>Save note</button></div></section>
     </div><aside className="detail-side-column"><section className="panel trade-context"><div className="panel-heading"><div><h2>Trade context</h2><p>Setup and process tags.</p></div></div><div className="context-row"><span>Strategy</span><strong>{trade.setup}</strong></div>{trade.brokerSymbol && <div className="context-row"><span>Broker symbol</span><strong>{trade.brokerSymbol}</strong></div>}<div className="context-row"><span>Direction</span><strong>{trade.side}</strong></div><div className="context-row"><span>Position size</span><strong>{trade.lots.toFixed(2)} lots</strong></div><div className="context-row"><span>Duration</span><strong>{duration(trade.date, trade.entryTime, trade.exitDate ?? trade.date, trade.exitTime)}</strong></div><div className="context-tags">{trade.tags.map((tag) => <span className="trade-tag" key={tag}>{tag}</span>)}</div></section><section className="panel day-context"><div className="panel-heading"><div><h2>Day note</h2><p>{shortDate(trade.exitDate ?? trade.date)}</p></div></div><p>{dayNote || 'No note for this trading day yet.'}</p></section></aside></div>
-    <div className="demo-note"><span className="status-dot"/>{trade.source === 'real' ? 'Your saved execution details.' : 'Sample execution details.'} P&L is calculated for USD-quoted pairs.</div>
+    {trade.source === 'real' && trade.printStatus && <TradePrintArtifact key={`print-${trade.id}`} tradeId={trade.id}/>}
+    <Replay key={trade.id} trade={trade}/>
+    <div className="demo-note"><span className="status-dot"/>{trade.source === 'real' ? 'Your saved execution details.' : 'Sample execution details.'} P&L includes commissions and swap.</div>
   </div>
 }
 
 function Notebook({ trades, dayNoteEdits, onSelectDay }: { trades: TradeWithPnl[]; dayNoteEdits: Record<string, string>; onSelectDay: (date: string) => void }) {
   const groups = byDay(trades)
   const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a))
-  return <div className="page-content"><PageHeading title="Notebook" description="Plans and reflections, kept alongside each session."/><section className="notes-list">{dates.map((date) => { const note = dayNoteEdits[date] ?? dayNotes[date] ?? ''; const summary = summarize(groups[date]); return <button className="note-entry" key={date} onClick={() => onSelectDay(date)}><span className="note-date"><strong>{new Date(`${date}T12:00:00`).getDate()}</strong><small>{weekday(date)} · {new Date(`${date}T12:00:00`).toLocaleString('en-US', { month: 'short' })}</small></span><span className="note-entry-copy"><strong>{note || 'No session note yet'}</strong><small>{groups[date].length} trades · <span className={currencyClass(summary.netPnl)}>{formatSignedMoney(summary.netPnl)}</span></small></span><Icon name="chevron" size={16}/></button> })}</section><div className="demo-note"><span className="status-dot"/>Sign in to save notes across devices.</div></div>
+  return <div className="page-content"><PageHeading title="Notebook" description="Plans and reflections, kept alongside each session."/><section className="notes-list" aria-label="Session notes">{!dates.length && <p className="notebook-empty">No trading sessions yet. Add trades to start keeping notes alongside your sessions.</p>}{dates.map((date) => { const note = dayNoteEdits[date] ?? dayNotes[date] ?? ''; const summary = summarize(groups[date]); return <button className="note-entry" key={date} onClick={() => onSelectDay(date)}><span className="note-date"><strong>{new Date(`${date}T12:00:00`).getDate()}</strong><small>{weekday(date)} · {new Date(`${date}T12:00:00`).toLocaleString('en-US', { month: 'short' })}</small></span><span className="note-entry-copy"><strong>{note || 'No session note yet'}</strong><small>{groups[date].length} trades · <span className={currencyClass(summary.netPnl)}>{formatSignedMoney(summary.netPnl)}</span></small></span><Icon name="chevron" size={16}/></button> })}</section><div className="demo-note"><span className="status-dot"/>Open a session to review or edit its day note.</div></div>
 }
 
 function duration(startDate: string, start: string, endDate: string, end: string) {

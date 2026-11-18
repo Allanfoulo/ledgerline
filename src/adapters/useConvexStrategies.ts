@@ -2,7 +2,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 
-export type Strategy = { id: string; name: string; rules: string[] }
+export type Strategy = { id: string; name: string; description: string; rules: string[] }
 export type StrategyReview = { tradeId: string; strategyId: string; checked: string[] }
 export function useConvexStrategies(authenticated: boolean, accountId: string) {
   const strategies = useQuery(api.strategies.list, authenticated ? {} : 'skip') as Strategy[] | undefined
@@ -11,7 +11,7 @@ export function useConvexStrategies(authenticated: boolean, accountId: string) {
   const review = useMutation(api.strategies.review)
   return {
     strategies: strategies ?? [], reviews: reviews ?? [],
-    saveStrategy: async (id: string | undefined, name: string, rules: string[]) => { await save({ id: id as Id<'strategies'> | undefined, name, rules }) },
+    saveStrategy: async (id: string | undefined, name: string, description: string, rules: string[]) => { return await (save as any)({ id: id as Id<'strategies'> | undefined, name, description, rules }) as string },
     saveReview: async (tradeId: string, strategyId: string, checked: string[]) => { await review({ accountId: accountId as Id<'tradingAccounts'>, tradeId: tradeId as Id<'journalTrades'>, strategyId: strategyId as Id<'strategies'>, checked }) },
   }
 }

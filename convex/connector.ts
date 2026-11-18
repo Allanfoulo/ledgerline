@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { action, internalMutation, internalQuery, mutation, query } from './_generated/server'
 import { internal } from './_generated/api'
 import { tradeFingerprint, validateTrade } from '../src/domain/trade'
+import { buildPrintChart } from '../src/domain/printChart'
 import { belongsTo, requireOwner } from './identity'
 
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -60,7 +61,68 @@ export const importDeals = internalMutation({ args: { hash: v.string(), brokerKe
     if (knownSources.has(sourceKey) || manualFills.has(fingerprint)) { duplicates++; continue }
     const tradeId = await ctx.db.insert('journalTrades', { owner: token.owner, accountId: token.accountId, sourceKey, ...(brokerSymbol ? { brokerSymbol } : {}), fingerprint, ...trade })
     for (const execution of executions) await ctx.db.insert('tradeExecutions', { owner: token.owner, accountId: token.accountId, tradeId, ...execution })
+    // Queue durable work in the same transaction; no provider or renderer runs here.
+    const createdAt = Date.now()
+    const printId = await ctx.db.insert('tradePrints', { owner: token.owner, accountId: token.accountId, tradeId, origin: 'mt5', timePrecision: 'minute', status: 'pending_chart', createdAt, schemaVersion: 1 })
+    await ctx.db.insert('printJobs', { owner: token.owner, accountId: token.accountId, tradeId, printId, status: 'queued', attempts: 0, createdAt, schemaVersion: 1 })
     knownSources.add(sourceKey); inserted++
   }
   return { inserted, duplicates }
+} })
+
+const printCandle = v.object({ time: v.string(), open: v.number(), high: v.number(), low: v.number(), close: v.number() })
+
+// The local MT5 connector is the only candle source in this milestone. It can
+// claim work only for the account bound to its hashed connector token.
+export const claimNextPrint = internalMutation({ args: { hash: v.string(), brokerKey: v.string(), leaseToken: v.string() }, handler: async (ctx, args) => {
+  const token = await ctx.db.query('connectorTokens').withIndex('by_hash', (q) => q.eq('hash', args.hash)).unique()
+  const now = Date.now()
+  if (!token || token.expiresAt <= now) throw new Error('Unauthorized')
+  const account = await ctx.db.get(token.accountId)
+  if (!account || account.owner !== token.owner || account.brokerKey !== args.brokerKey) throw new Error('Unauthorized')
+  const jobs = await ctx.db.query('printJobs').withIndex('by_owner_account', (q) => q.eq('owner', token.owner).eq('accountId', token.accountId)).collect()
+  const candidates = jobs.filter((job) => job.status === 'queued' || (job.status === 'retry_wait' && (job.nextAttemptAt ?? 0) <= now) || (job.status === 'acquiring' && (job.leaseUntil ?? 0) <= now)).sort((a, b) => a.createdAt - b.createdAt)
+  for (const job of candidates) {
+    const attempts = job.attempts ?? 0
+    if (attempts >= 3) {
+      await ctx.db.patch(job._id, { status: 'failed', leaseToken: undefined, leaseUntil: undefined, errorCode: job.errorCode ?? 'source_unavailable' })
+      await ctx.db.patch(job.printId, { status: 'failed' })
+      continue
+    }
+    const trade = await ctx.db.get(job.tradeId)
+    if (!trade || !trade.sourceKey || !trade.brokerSymbol) {
+      await ctx.db.patch(job._id, { status: 'needs_data', errorCode: 'trade_source_missing' })
+      await ctx.db.patch(job.printId, { status: 'needs_data' })
+      continue
+    }
+    await ctx.db.patch(job._id, { status: 'acquiring', attempts: attempts + 1, leaseToken: args.leaseToken, leaseUntil: now + 120_000, nextAttemptAt: undefined, errorCode: undefined })
+    const executions = await ctx.db.query('tradeExecutions').withIndex('by_owner_trade', (q) => q.eq('owner', token.owner).eq('tradeId', trade._id)).collect()
+    return { jobId: job._id, leaseToken: args.leaseToken, sourceKey: trade.sourceKey, symbol: trade.brokerSymbol, trade: { date: trade.date, ...(trade.exitDate ? { exitDate: trade.exitDate } : {}), entryTime: trade.entryTime, exitTime: trade.exitTime }, executions: executions.map(({ date, time, action, price, lots }) => ({ ...(date ? { date } : {}), time, action, price, lots })) }
+  }
+  return null
+} })
+
+export const storePrintCandles = internalMutation({ args: { hash: v.string(), brokerKey: v.string(), jobId: v.id('printJobs'), leaseToken: v.string(), sourceKey: v.string(), symbol: v.string(), quality: v.union(v.literal('complete'), v.literal('partial'), v.literal('unavailable')), candles: v.array(printCandle) }, handler: async (ctx, args) => {
+  const token = await ctx.db.query('connectorTokens').withIndex('by_hash', (q) => q.eq('hash', args.hash)).unique()
+  if (!token || token.expiresAt <= Date.now()) throw new Error('Unauthorized')
+  const account = await ctx.db.get(token.accountId)
+  const job = await ctx.db.get(args.jobId)
+  if (!account || account.owner !== token.owner || account.brokerKey !== args.brokerKey || !job || job.owner !== token.owner || job.accountId !== token.accountId || job.status !== 'acquiring' || job.leaseToken !== args.leaseToken || (job.leaseUntil ?? 0) <= Date.now()) throw new Error('Unauthorized')
+  const trade = await ctx.db.get(job.tradeId)
+  if (!trade || trade.sourceKey !== args.sourceKey || trade.brokerSymbol !== args.symbol) throw new Error('Invalid print source')
+  if (args.quality === 'unavailable' || !args.candles.length) {
+    await ctx.db.patch(job._id, { status: 'needs_data', leaseToken: undefined, leaseUntil: undefined, errorCode: 'mt5_history_unavailable' })
+    await ctx.db.patch(job.printId, { status: 'needs_data' })
+    return { status: 'needs_data' as const }
+  }
+  if (args.candles.length > 5000) throw new Error('Too many candles')
+  const executions = await ctx.db.query('tradeExecutions').withIndex('by_owner_trade', (q) => q.eq('owner', token.owner).eq('tradeId', trade._id)).collect()
+  const chartTrade = { id: String(trade._id), date: trade.date, ...(trade.exitDate ? { exitDate: trade.exitDate } : {}), pair: trade.pair, side: trade.side, lots: trade.lots, entry: trade.entry, exit: trade.exit, entryTime: trade.entryTime, exitTime: trade.exitTime, commission: trade.commission, swap: trade.swap, setup: trade.setup, tags: [], note: '', executions: executions.map(({ date, time, action, price, lots }) => ({ ...(date ? { date } : {}), time, action, price, lots })) }
+  const sourceRetrievedAt = new Date().toISOString()
+  const chart = buildPrintChart(chartTrade, args.candles, 'mt5_candles', sourceRetrievedAt)
+  const print = await ctx.db.get(job.printId)
+  if (!print || print.owner !== token.owner || print.tradeId !== trade._id) throw new Error('Print not found')
+  await ctx.db.patch(print._id, { status: 'pending_capture', candles: chart.candles, sourceRetrievedAt: Date.parse(sourceRetrievedAt), coverage: chart.quality })
+  await ctx.db.patch(job._id, { status: 'ready_to_render', leaseToken: undefined, leaseUntil: undefined, errorCode: undefined })
+  return { status: 'ready_to_render' as const }
 } })

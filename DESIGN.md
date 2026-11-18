@@ -1,5 +1,5 @@
 ---
-name: Ledgerline
+name: SidePrint
 description: A calm, precise personal FX trading journal.
 colors:
   canvas: "#101512"
@@ -64,13 +64,13 @@ components:
     padding: "16px"
 ---
 
-# Design System: Ledgerline
+# Design System: SidePrint
 
 ## Overview
 
-**Creative North Star: “The Quiet Ledger”**
+**Creative North Star: “The record behind the result”**
 
-Ledgerline treats a trade journal as a clear working record. It keeps the screen calm and dark for repeated review sessions, while each number stays easy to scan and trace back to a trade. The interface has a compact navigation rail, broad review area, and tightly grouped data tables. Profit and loss colors are reserved for outcome values, so they keep their meaning.
+SidePrint treats a trade journal as a clear working record. It keeps the screen calm and dark for repeated review sessions, while each number stays easy to scan and trace back to a trade. The interface has a compact navigation rail, broad review area, and tightly grouped data tables. Profit and loss colors are reserved for outcome values, so they keep their meaning.
 
 The system favors disciplined spacing, quiet borders, and a small set of layered surfaces. Type distinguishes the page title from compact labels and tabular values. It avoids ornamental trading imagery and relies on the calendar, execution details, and notes as the substance of the page.
 
@@ -151,3 +151,15 @@ Controls and panels use restrained 5–9px corners; larger containers cap at 12p
 - Don't imply live quotes, connected broker data, or durable note storage.
 - Don't make every metric a standalone rounded card.
 - Don't use decorative mono type or accent color without a clear data meaning.
+
+
+## SidePrint identity
+
+SidePrint is a personal trading journal and performance-review workspace. Its mark uses three record lines, with a longer middle line, in a mint enclosure. The mark represents a record rather than an investment outcome. Brand mint is distinct from the semantic colors used to communicate profit and loss.
+
+The signed-out introduction uses “The result isn't the whole story” and “Every trade leaves a print.” Product screens prioritize real data, clear state and restrained visual hierarchy. Do not add fabricated trading outcomes, decorative paper texture behind data, or claims of trade execution. The working name is provisional.
+
+
+## Shared implementation tokens
+
+Dark and light themes define the same semantic CSS variables: `--bg`, `--surface`, `--surface-raised`, `--surface-soft`, `--line`, `--line-soft`, `--text`, `--muted`, `--green`, `--green-strong`, `--red` and `--amber`. Components should use them for shared surface, text and outcome roles, while charts and other specialized states may need their own explicit theme variants. `--radius-sm`, `--radius-md` and `--radius-lg` encode the existing corner scale. New controls should provide a visible keyboard focus indicator and at least a 24px target; use 44px for touch controls where the layout allows it.

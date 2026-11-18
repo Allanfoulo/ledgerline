@@ -1,4 +1,4 @@
-# Ledgerline · Personal FX Journal
+# SidePrint · Trading journal and performance review
 
 An Essential-first React + TypeScript prototype for reviewing illustrative Forex trades.
 

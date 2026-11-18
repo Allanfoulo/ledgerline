@@ -37,7 +37,7 @@ test('connector stores individual fills and avoids importing a source twice', as
   const token = { owner: 'u', accountId: 'a', expiresAt: Date.now() + 10000 }; const account = { owner: 'u', brokerKey: 'b'.repeat(64) }
   const first = context(token, account)
   assert.deepEqual(await (importDeals as any)._handler(first.ctx, { hash: 'good', brokerKey: 'b'.repeat(64), trades: [base, base] }), { inserted: 1, duplicates: 1 })
-  assert.deepEqual(first.writes, ['journalTrades', 'tradeExecutions', 'tradeExecutions'])
+  assert.deepEqual(first.writes, ['journalTrades', 'tradeExecutions', 'tradeExecutions', 'tradePrints', 'printJobs'])
 })
 test('distinct MT5 position IDs with matching details remain distinct; manual matches stay protected', async () => {
   const token = { owner: 'u', accountId: 'a', expiresAt: Date.now() + 10000 }; const account = { owner: 'u', brokerKey: 'b'.repeat(64) }
@@ -47,6 +47,7 @@ test('distinct MT5 position IDs with matching details remain distinct; manual ma
   const fingerprint = JSON.stringify([base.date, base.pair, base.side, base.lots, base.entry, base.exit, base.entryTime, base.exitTime, base.commission, base.swap])
   const manual = context(token, account, [{ fingerprint }])
   assert.deepEqual(await (importDeals as any)._handler(manual.ctx, { hash: 'good', brokerKey: 'b'.repeat(64), trades: [base] }), { inserted: 0, duplicates: 1 })
+  assert.equal(manual.writes.includes('tradePrints'), false)
 })
 test('connector accepts verified gold fills spanning two dates', async () => {
   const gold = { ...base, brokerSymbol: 'XAUUSDz', date: '2026-11-02', exitDate: '2026-11-03', pair: 'XAU/USD', entry: 4000, exit: 4002, entryTime: '23:00', exitTime: '01:00', executions: [{ date: '2026-11-02', time: '23:00', action: 'Buy', price: 4000, lots: 1 }, { date: '2026-11-03', time: '01:00', action: 'Sell', price: 4002, lots: 1 }] }
