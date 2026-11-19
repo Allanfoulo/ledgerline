@@ -284,7 +284,15 @@ export default function ExecutionPlans({ initialPlanId, onReviewNoTrade }: { ini
 
           <div className={active.status === 'draft' ? 'plan-draft-workspace' : ''}>
           <div className={active.status === 'draft' ? 'plan-draft-image-column' : ''}>
-          {active.status === 'draft' && <PlanImageWorkflow planId={active.id} revision={revision} onRevisionChange={setRevision} onApply={(draft) => {
+          {active.status === 'draft' && <PlanImageWorkflow planId={active.id} revision={revision} onRevisionChange={setRevision} onAddRules={(rules) => {
+            const existing = new Set(content.confirmations.map((item) => item.condition.trim().toLocaleLowerCase()))
+            const unique = rules.map((rule) => rule.trim()).filter((rule) => { const key = rule.toLocaleLowerCase(); if (!rule || existing.has(key)) return false; existing.add(key); return true })
+            const available = Math.max(0, 20 - content.confirmations.length)
+            const additions: PlanConfirmation[] = unique.slice(0, available).map((condition) => ({ condition, role: 'required', status: 'not_seen', source: 'user' }))
+            if (additions.length) { update('confirmations', [...content.confirmations, ...additions]); setMessage(`${additions.length} rules added. Save the draft to keep them.`) }
+            else setMessage(unique.length ? 'The plan already has 20 conditions. Remove one to add more.' : 'These rules are already in the plan.')
+            if (unique.length > available && additions.length) setMessage(`Added ${additions.length} rules. Remove conditions to make room for the remaining rules.`)
+          }} onApply={(draft) => {
             setContent((current) => {
               const availableSlots = Math.max(0, 20 - current.confirmations.length)
               const suggestedSignals = draft.signals.slice(0, availableSlots).map((signal): PlanConfirmation => ({

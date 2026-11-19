@@ -7,7 +7,7 @@ import type { Trade } from './types'
 import type { TradeInput } from './domain/trade'
 import { useConvexJournal } from './adapters/useConvexJournal'
 import { useConvexStrategies } from './adapters/useConvexStrategies'
-import type { Strategy, StrategyReview } from './adapters/useConvexStrategies'
+import type { Strategy, StrategyReview, StrategyPlaybook } from './adapters/useConvexStrategies'
 import { useConvexBacktests } from './adapters/useConvexBacktests'
 import type { BacktestDraft, BacktestSession } from './adapters/useConvexBacktests'
 import { useConvexConnector } from './adapters/useConvexConnector'
@@ -24,7 +24,7 @@ type Backend = {
   realTrades: Trade[]; tradesLoading: boolean
   strategies: Strategy[]; reviews: StrategyReview[]
   backtests: BacktestSession[]; saveBacktest: (draft: BacktestDraft) => Promise<void>
-  saveStrategy: (id: string | undefined, name: string, description: string, rules: string[]) => Promise<string>; saveReview: (tradeId: string, strategyId: string, checked: string[]) => Promise<void>
+  saveStrategy: (id: string | undefined, name: string, description: string, rules: string[], playbook: StrategyPlaybook) => Promise<string>; saveReview: (tradeId: string, strategyId: string, checked: string[]) => Promise<void>
   createAccount: (name: string) => Promise<void>; saveTrades: (accountId: string, trades: TradeInput[], allowDuplicates: boolean) => Promise<{ inserted: number; duplicates: number }>
   saveNote: (kind: 'day' | 'trade', key: string, text: string) => void
   candles: (args: { pair: string; date: string; exitDate?: string; entryTime: string; exitTime: string }) => Promise<Candle[]>

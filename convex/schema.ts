@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 import { authTables } from '@convex-dev/auth/server'
 import { chartAnalysisSuggestions, planContent } from './planValidators'
+import { playbook } from './strategyValidators'
 
 export default defineSchema({
   ...authTables,
@@ -17,8 +18,9 @@ export default defineSchema({
   planImages: defineTable({ owner: v.string(), planId: v.id('executionPlans'), storageId: v.id('_storage'), previewStorageId: v.id('_storage'), mimeType: v.union(v.literal('image/png'), v.literal('image/jpeg'), v.literal('image/webp')), size: v.number(), createdAt: v.number() }).index('by_plan', ['planId']),
   pendingPlanUploads: defineTable({ owner: v.string(), planId: v.id('executionPlans'), createdAt: v.number(), expiresAt: v.number() }).index('by_plan', ['planId']),
   planAnalysisRuns: defineTable({ owner: v.string(), planId: v.id('executionPlans'), imageId: v.id('planImages'), strategyVersionId: v.optional(v.id('strategyVersions')), provider: v.string(), model: v.string(), suggestions: chartAnalysisSuggestions, createdAt: v.number() }).index('by_plan', ['planId']),
-  strategies: defineTable({ owner: v.string(), name: v.string(), description: v.optional(v.string()), rules: v.array(v.string()) }).index('by_owner', ['owner']),
-  strategyVersions: defineTable({ owner: v.string(), strategyId: v.id('strategies'), version: v.number(), name: v.string(), description: v.string(), rules: v.array(v.string()), signals: v.array(v.object({ name: v.string(), description: v.string() })), committedAt: v.number() }).index('by_strategy', ['strategyId']).index('by_owner', ['owner']),
+  strategies: defineTable({ owner: v.string(), name: v.string(), description: v.optional(v.string()), rules: v.array(v.string()), playbook: v.optional(playbook) }).index('by_owner', ['owner']),
+  strategyVersions: defineTable({ owner: v.string(), strategyId: v.id('strategies'), version: v.number(), name: v.string(), description: v.string(), rules: v.array(v.string()), signals: v.array(v.object({ name: v.string(), description: v.string() })), playbook: v.optional(playbook), exampleIds: v.optional(v.array(v.id('strategyExamples'))), committedAt: v.number() }).index('by_strategy', ['strategyId']).index('by_owner', ['owner']),
+  strategyExamples: defineTable({ owner: v.string(), strategyId: v.id('strategies'), storageId: v.id('_storage'), label: v.string(), kind: v.union(v.literal('qualifies'), v.literal('does_not_qualify')), notes: v.string(), mimeType: v.string(), size: v.number(), createdAt: v.number(), archived: v.optional(v.boolean()) }).index('by_strategy', ['strategyId']),
   planStrategySelections: defineTable({ owner: v.string(), planId: v.id('executionPlans'), strategyVersionId: v.optional(v.id('strategyVersions')), analysisRunId: v.optional(v.id('planAnalysisRuns')) }).index('by_plan', ['planId']),
   planVersionStrategies: defineTable({ owner: v.string(), planId: v.id('executionPlans'), planVersionId: v.id('executionPlanVersions'), strategyVersionId: v.id('strategyVersions') }).index('by_plan_version', ['planVersionId']),
   planVersionImages: defineTable({ owner: v.string(), planVersionId: v.id('executionPlanVersions'), imageId: v.id('planImages') }).index('by_plan_version', ['planVersionId']),

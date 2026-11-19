@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { attachExample, commitVersion, examples, removeExample, save, uploadExample, verifyExampleStrategy } from '../convex/strategies'
 import { add, createUploadUrl, draftContext, list, remove, setDraftContext, strategyChoices, versionEvidence } from '../convex/planImages'
 
 type Row = Record<string, any> & { _id: string; _table: string }
@@ -173,4 +174,41 @@ test('an image cannot be removed after commitment, preserving its versioned evid
   state.rows.set('plan-a', { ...state.rows.get('plan-a')!, status: 'committed' })
   await assert.rejects(() => (remove as any)._handler(state.ctx, { imageId: 'image-a' }), /Draft image not found/)
   assert.equal(state.rows.has('image-a'), true)
+})
+
+
+test('strategy playbook versions preserve rules, fields and chart examples and enforce ownership', async () => {
+  const state = mockContext('user-a', [{ table: 'strategies', id: 'strategy-a', value: { owner: 'user-a', name: 'ISX', description: '', rules: ['Wait'] } }])
+  const playbook = { markets: 'XAU/USD', timeframes: '15m', context: '', signalSequence: 'S1 then S2', entry: 'Close', invalidation: 'Swing', protectiveStop: '', targets: '', management: '' }
+  await (save as any)._handler(state.ctx, { id: 'strategy-a', name: 'ISX', description: '', rules: ['Wait'], playbook })
+  const exampleId = await (attachExample as any)._handler(state.ctx, { owner: 'user-a', strategyId: 'strategy-a', storageId: 'image-a', label: 'Valid setup', kind: 'qualifies', notes: 'S2 close', mimeType: 'image/png', size: 9 })
+  const versionId = await (commitVersion as any)._handler(state.ctx, { strategyId: 'strategy-a', expectedVersion: 0, signals: [] })
+  assert.deepEqual(state.rows.get(versionId)?.playbook, playbook)
+  assert.deepEqual(state.rows.get(versionId)?.exampleIds, [exampleId])
+  await (save as any)._handler(state.ctx, { id: 'strategy-a', name: 'ISX', description: '', rules: ['Changed'], playbook: { ...playbook, entry: 'Later' } })
+  assert.equal(state.rows.get(versionId)?.playbook.entry, 'Close')
+  assert.deepEqual(state.rows.get(versionId)?.rules, ['Wait'])
+  assert.equal((await (examples as any)._handler(state.ctx, { strategyId: 'strategy-a' }))[0].locked, true)
+  await (removeExample as any)._handler(state.ctx, { exampleId })
+  assert.equal(state.rows.get(exampleId)?.archived, true)
+  assert.equal((await (examples as any)._handler(state.ctx, { strategyId: 'strategy-a' }))[0].archived, true)
+  state.ctx.auth.getUserIdentity = async () => ({ subject: 'user-b' })
+  await assert.rejects(() => (examples as any)._handler(state.ctx, { strategyId: 'strategy-a' }), /Strategy not found/)
+  await assert.rejects(() => (removeExample as any)._handler(state.ctx, { exampleId }), /not found/)
+})
+
+test('strategy example upload rejects invalid images and other owners before storage', async () => {
+  const state = mockContext('user-a', [{ table: 'strategies', id: 'strategy-a', value: { owner: 'user-a', name: 'ISX', rules: [] } }])
+  const ctx = state.ctx as any
+  ctx.runQuery = async (_ref: unknown, args: any) => (verifyExampleStrategy as any)._handler(ctx, args)
+  ctx.runMutation = async (_ref: unknown, args: any) => (attachExample as any)._handler(ctx, args)
+  const args = { strategyId: 'strategy-a', base64: Buffer.from('invalid').toString('base64'), mimeType: 'image/png', label: 'Example', kind: 'qualifies', notes: '' }
+  state.ctx.auth.getUserIdentity = async () => ({ subject: 'user-b' })
+  await assert.rejects(() => (uploadExample as any)._handler(ctx, args), /Strategy not found/)
+  state.ctx.auth.getUserIdentity = async () => ({ subject: 'user-a' })
+  await assert.rejects(() => (uploadExample as any)._handler(ctx, args), /not a supported image/)
+  assert.equal(state.files.size, 0)
+  const result = await (uploadExample as any)._handler(ctx, { ...args, base64: Buffer.from(validPng()).toString('base64') })
+  assert.ok(state.rows.get(result.exampleId))
+  assert.equal(state.files.size, 1)
 })

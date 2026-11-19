@@ -48,7 +48,7 @@ export const versionEvidence = query({ args: { planVersionId: v.id('executionPla
 export const strategyChoices = query({ args: {}, handler: async (ctx) => {
   const owner = await requireOwner(ctx)
   const versions = await ctx.db.query('strategyVersions').withIndex('by_owner', (q) => q.gte('owner', owner).lt('owner', `${owner}}`)).collect()
-  return versions.filter((version) => belongsTo(version.owner, owner)).sort((a, b) => a.name.localeCompare(b.name) || b.version - a.version).map(({ _id, strategyId, name, version, description, signals }) => ({ id: _id, strategyId, name, version, description, signals }))
+  return versions.filter((version) => belongsTo(version.owner, owner)).sort((a, b) => a.name.localeCompare(b.name) || b.version - a.version).map(({ _id, strategyId, name, version, description, signals, rules, playbook }) => ({ id: _id, strategyId, name, version, description, signals, rules, playbook }))
 } })
 
 export const draftContext = query({ args: { planId: v.id('executionPlans') }, handler: async (ctx, { planId }) => {

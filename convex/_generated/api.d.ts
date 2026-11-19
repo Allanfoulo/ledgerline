@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as backtests from "../backtests.js";
+import type * as chartAnalysisProviders from "../chartAnalysisProviders.js";
 import type * as connector from "../connector.js";
 import type * as executionPlans from "../executionPlans.js";
 import type * as http from "../http.js";
@@ -17,11 +18,15 @@ import type * as identity from "../identity.js";
 import type * as journal from "../journal.js";
 import type * as notes from "../notes.js";
 import type * as passwordRecovery from "../passwordRecovery.js";
+import type * as planImages from "../planImages.js";
+import type * as planValidators from "../planValidators.js";
 import type * as printReviews from "../printReviews.js";
 import type * as prints from "../prints.js";
+import type * as providerKeys from "../providerKeys.js";
 import type * as samplePrices from "../samplePrices.js";
 import type * as secrets from "../secrets.js";
 import type * as strategies from "../strategies.js";
+import type * as strategyValidators from "../strategyValidators.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   backtests: typeof backtests;
+  chartAnalysisProviders: typeof chartAnalysisProviders;
   connector: typeof connector;
   executionPlans: typeof executionPlans;
   http: typeof http;
@@ -39,11 +45,15 @@ declare const fullApi: ApiFromModules<{
   journal: typeof journal;
   notes: typeof notes;
   passwordRecovery: typeof passwordRecovery;
+  planImages: typeof planImages;
+  planValidators: typeof planValidators;
   printReviews: typeof printReviews;
   prints: typeof prints;
+  providerKeys: typeof providerKeys;
   samplePrices: typeof samplePrices;
   secrets: typeof secrets;
   strategies: typeof strategies;
+  strategyValidators: typeof strategyValidators;
 }>;
 
 /**

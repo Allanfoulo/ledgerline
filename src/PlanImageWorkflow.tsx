@@ -14,7 +14,7 @@ const suggestionFields = [
 type SuggestionField = (typeof suggestionFields)[number][0]
 
 type ImageItem = { id: Id<'planImages'>; createdAt: number; mimeType: string; size: number }
-type StrategyChoice = { id: Id<'strategyVersions'>; strategyId: Id<'strategies'>; name: string; version: number; description: string; signals: Array<{ name: string; description: string }> }
+type StrategyChoice = { id: Id<'strategyVersions'>; strategyId: Id<'strategies'>; name: string; version: number; description: string; rules: string[]; signals: Array<{ name: string; description: string }> }
 type PendingAnalysis = { imageId: Id<'planImages'>; provider: string; model: string }
 
 function fileDataUrl(blob: Blob): Promise<string> {
@@ -46,11 +46,12 @@ async function makePreview(file: File) {
   }
 }
 
-export default function PlanImageWorkflow({ planId, revision, onRevisionChange, onApply }: {
+export default function PlanImageWorkflow({ planId, revision, onRevisionChange, onApply, onAddRules }: {
   planId: string
   revision: number
   onRevisionChange: (revision: number) => void
   onApply: (draft: ChartAnalysisDraft) => void
+  onAddRules: (rules: string[]) => void
 }) {
   const images = useQuery(imageApi.list, { planId: planId as Id<'executionPlans'> }) as ImageItem[] | undefined
   const context = useQuery(imageApi.draftContext, { planId: planId as Id<'executionPlans'> }) as { strategyVersionId: Id<'strategyVersions'> | null; strategyId: Id<'strategies'> | null; analysis: { provider: string; model: string; createdAt: number } | null } | null | undefined
@@ -170,6 +171,7 @@ export default function PlanImageWorkflow({ planId, revision, onRevisionChange, 
       <label>Analysis provider<select value={providerId} disabled={busy} onChange={(event) => { const next = chartAnalysisProviderCatalog.find((item) => item.id === event.target.value); if (next) { setProviderId(next.id); setModelId(next.models[0].id) } }}>{chartAnalysisProviderCatalog.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <label>Model<select value={modelId} disabled={busy} onChange={(event) => setModelId(event.target.value)}>{provider.models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
     </div>
+    {strategyVersionId && <div className="plan-strategy-snapshot"><strong>Pre-trade checklist</strong><p>Copy the selected playbook rules into your plan, then mark and edit them as you review the setup.</p><button type="button" className="button button-quiet" disabled={busy || !strategies?.find((choice) => choice.id === strategyVersionId)?.rules?.length} onClick={() => onAddRules(strategies?.find((choice) => choice.id === strategyVersionId)?.rules ?? [])}>Add strategy rules to plan</button></div>}
     <p className="plan-image-consent">Analysis sends the selected original chart and the chosen strategy version to {provider.label}. It does not submit trades or place orders. {provider.dataUseNotice} Check the provider’s current data terms before continuing.</p>
     {message && <p role="status">{message}</p>}{error && <p role="alert" className="plan-image-error">{error}</p>}
     <div className="plan-image-gallery">{images === undefined ? <p role="status">Loading attached charts…</p> : images.length ? images.map((image) => <article className="plan-image-card" key={image.id}>
